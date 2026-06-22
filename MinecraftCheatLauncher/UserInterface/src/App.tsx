@@ -24,10 +24,10 @@ const WPF_WIDE_PANEL_SECTIONS = new Set(['account', 'settings', ...BOTTOM_SECTIO
 const SETTINGS_WIDTH_PANEL_SECTIONS = new Set(['settings', ...BOTTOM_SECTION_ITEMS.map((section) => section.id)]);
 
 const DEFAULT_GLASS_TUNING: GlassTuningSettings = {
-  refraction: 0.018,
-  bevelDepth: 0.045,
-  bevelWidth: 0.24,
-  frost: 0.35,
+  refraction: 0.014,
+  bevelDepth: 0.02,
+  bevelWidth: 0.15,
+  frost: 0,
   resolution: 3
 };
 
