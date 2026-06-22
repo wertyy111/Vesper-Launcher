@@ -18,7 +18,6 @@ internal static class Program
     private const int LauncherHeight = 720;
     private const int LauncherMinWidth = 960;
     private const int LauncherMinHeight = 620;
-    private static readonly int LauncherCornerRadius = 12;
     private const int WmNclButtonDown = 0x00A1;
     private const int HtCaption = 0x0002;
     private const int DwmwaWindowCornerPreference = 33;
@@ -206,8 +205,22 @@ internal static class Program
 
     private static void ApplyRoundedWindowShape(IntPtr handle, int width, int height, double scale)
     {
+        _ = width;
+        _ = height;
+        _ = scale;
+
+        // Photino on Windows 10 can render a shifted transparent edge when a
+        // manual rounded window region is applied. Keep the native window
+        // rectangular and let the web UI handle visual polish inside it.
+        _ = SetWindowRgn(handle, IntPtr.Zero, true);
+
         try
         {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+            {
+                return;
+            }
+
             var cornerPreference = DwmWindowCornerPreferenceRound;
             _ = DwmSetWindowAttribute(
                 handle,
@@ -218,31 +231,6 @@ internal static class Program
         catch
         {
             // DWM rounded-corner preference is only available on newer Windows.
-        }
-
-        if (LauncherCornerRadius <= 0)
-        {
-            _ = SetWindowRgn(handle, IntPtr.Zero, true);
-            return;
-        }
-
-        var radius = Math.Max(1, ScaleWindowSize(LauncherCornerRadius, scale));
-        var regionHandle = CreateRoundRectRgn(
-            nLeftRect: 0,
-            nTopRect: 0,
-            nRightRect: width + 1,
-            nBottomRect: height + 1,
-            nWidthEllipse: radius * 2,
-            nHeightEllipse: radius * 2);
-
-        if (regionHandle == IntPtr.Zero)
-        {
-            return;
-        }
-
-        if (SetWindowRgn(handle, regionHandle, true) == 0)
-        {
-            DeleteObject(regionHandle);
         }
     }
 
@@ -704,21 +692,8 @@ internal static class Program
         int cy,
         uint flags);
 
-    [DllImport("gdi32.dll", SetLastError = true)]
-    private static extern IntPtr CreateRoundRectRgn(
-        int nLeftRect,
-        int nTopRect,
-        int nRightRect,
-        int nBottomRect,
-        int nWidthEllipse,
-        int nHeightEllipse);
-
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
-
-    [DllImport("gdi32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool DeleteObject(IntPtr hObject);
 
     private delegate bool EnumWindowsProc(IntPtr handle, IntPtr extraData);
 
