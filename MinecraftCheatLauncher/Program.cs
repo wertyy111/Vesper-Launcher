@@ -18,6 +18,7 @@ internal static class Program
     private const int LauncherHeight = 720;
     private const int LauncherMinWidth = 960;
     private const int LauncherMinHeight = 620;
+    private const int LauncherCornerRadius = 14;
     private const int WmNclButtonDown = 0x00A1;
     private const int HtCaption = 0x0002;
     private const int DwmwaWindowCornerPreference = 33;
@@ -183,8 +184,6 @@ internal static class Program
             top = workArea.Top + (workArea.Height - targetHeight) / 2;
         }
 
-        ApplyRoundedWindowShape(handle, targetWidth, targetHeight, monitorScale);
-
         uint flags = 0;
         if (updatePosition)
         {
@@ -200,37 +199,53 @@ internal static class Program
             flags |= SwpNoMove;
         }
 
-        return SetWindowPos(handle, IntPtr.Zero, left, top, targetWidth, targetHeight, flags);
+        var boundsApplied = SetWindowPos(handle, IntPtr.Zero, left, top, targetWidth, targetHeight, flags);
+        if (boundsApplied)
+        {
+            ApplyRoundedWindowShape(handle, targetWidth, targetHeight, monitorScale);
+        }
+
+        return boundsApplied;
     }
 
     private static void ApplyRoundedWindowShape(IntPtr handle, int width, int height, double scale)
     {
-        _ = width;
-        _ = height;
-        _ = scale;
-
-        // Photino on Windows 10 can render a shifted transparent edge when a
-        // manual rounded window region is applied. Keep the native window
-        // rectangular and let the web UI handle visual polish inside it.
-        _ = SetWindowRgn(handle, IntPtr.Zero, true);
-
         try
         {
-            if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+            if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
             {
+                _ = SetWindowRgn(handle, IntPtr.Zero, true);
+                var cornerPreference = DwmWindowCornerPreferenceRound;
+                _ = DwmSetWindowAttribute(
+                    handle,
+                    DwmwaWindowCornerPreference,
+                    ref cornerPreference,
+                    Marshal.SizeOf<int>());
                 return;
             }
-
-            var cornerPreference = DwmWindowCornerPreferenceRound;
-            _ = DwmSetWindowAttribute(
-                handle,
-                DwmwaWindowCornerPreference,
-                ref cornerPreference,
-                Marshal.SizeOf<int>());
         }
         catch
         {
             // DWM rounded-corner preference is only available on newer Windows.
+        }
+
+        var radius = Math.Max(1, ScaleWindowSize(LauncherCornerRadius, scale));
+        var regionHandle = CreateRoundRectRgn(
+            nLeftRect: 0,
+            nTopRect: 0,
+            nRightRect: width,
+            nBottomRect: height,
+            nWidthEllipse: radius * 2,
+            nHeightEllipse: radius * 2);
+
+        if (regionHandle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        if (SetWindowRgn(handle, regionHandle, true) == 0)
+        {
+            DeleteObject(regionHandle);
         }
     }
 
@@ -692,8 +707,21 @@ internal static class Program
         int cy,
         uint flags);
 
+    [DllImport("gdi32.dll", SetLastError = true)]
+    private static extern IntPtr CreateRoundRectRgn(
+        int nLeftRect,
+        int nTopRect,
+        int nRightRect,
+        int nBottomRect,
+        int nWidthEllipse,
+        int nHeightEllipse);
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeleteObject(IntPtr hObject);
 
     private delegate bool EnumWindowsProc(IntPtr handle, IntPtr extraData);
 
