@@ -655,19 +655,25 @@ public partial class MainWindow
             profilePath = ResolveCurrentProfileDirectory(),
             savedUsernames = _savedUsernames.ToArray(),
             displayedMemoryMb = ResolveDisplayedMemoryMb(),
-            availableVersions = _availableVersionChoices.Select(choice => new
+            availableVersions = _availableVersionChoices.Select(choice =>
             {
-                key = choice.Key,
-                displayName = choice.DisplayName,
-                baseVersionId = choice.BaseVersionId,
-                versionId = choice.Version?.Id,
-                availabilityNote = choice.AvailabilityNote,
-                isSelected = string.Equals(choice.Key, selectedChoice?.Key, StringComparison.Ordinal),
-                isInstalled = choice.Version is not null,
-                loaders = GetSelectionEntryLoaders(choice).Select(GetLoaderDisplayName).ToArray(),
-                subtitle = choice.Version is not null
-                    ? choice.Version.Id
-                    : $"{choice.BaseVersionId} + {BuildLoaderCombinationDisplayName(GetSelectionEntryLoaders(choice))}"
+                var versionState = ResolveVersionStateForChoice(choice);
+                return new
+                {
+                    key = choice.Key,
+                    displayName = choice.DisplayName,
+                    baseVersionId = choice.BaseVersionId,
+                    versionId = choice.Version?.Id,
+                    availabilityNote = choice.AvailabilityNote,
+                    isSelected = string.Equals(choice.Key, selectedChoice?.Key, StringComparison.Ordinal),
+                    isInstalled = versionState.State == VersionInstallState.Installed,
+                    installState = versionState.State.ToString(),
+                    actionText = versionState.ButtonText,
+                    loaders = GetSelectionEntryLoaders(choice).Select(GetLoaderDisplayName).ToArray(),
+                    subtitle = choice.Version is not null
+                        ? choice.Version.Id
+                        : $"{choice.BaseVersionId} + {BuildLoaderCombinationDisplayName(GetSelectionEntryLoaders(choice))}"
+                };
             }).ToArray()
         };
     }

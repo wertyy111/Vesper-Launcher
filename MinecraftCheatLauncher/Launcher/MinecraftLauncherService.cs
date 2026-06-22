@@ -8403,9 +8403,11 @@ public sealed class MinecraftLauncherService
     {
         var args = new List<string>();
 
-        var (xms, xmx) = ResolveEffectiveJvmMemorySettings(options, javaMajorVersion);
-        args.Add($"-Xms{xms}M");
-        args.Add($"-Xmx{xmx}M");
+        var jvmPlan = new JvmArgBuilder().Build(new JvmArgBuildRequest(
+            options.Version.Id,
+            options.MemoryMb,
+            javaMajorVersion));
+        args.AddRange(jvmPlan.Arguments);
 
         var hasJvmArgsFromMetadata = false;
         if (versionRoot.TryGetProperty("arguments", out var argumentsElement) &&
@@ -8424,16 +8426,11 @@ public sealed class MinecraftLauncherService
             args.Add($"-Djava.io.tmpdir={javaTemporaryDirectory}");
         }
 
-        // Add networking fixes common in pirate launchers
-        args.Add("-Djava.net.preferIPv4Stack=true");
-        args.Add("-Djava.net.useSystemProxies=true");
-
         // Never replace the JVM hosts file for skins: it breaks DNS for multiplayer servers
         // and causes UnknownHost/endless connecting on arbitrary server addresses.
 
         // Java 9+ compatibility for versions that need module opens/exports.
         args.Add("-XX:+IgnoreUnrecognizedVMOptions");
-        args.Add("-XX:+UnlockExperimentalVMOptions");
         if (javaMajorVersion >= 9)
         {
             args.Add("--add-exports=java.base/sun.security.util=ALL-UNNAMED");
@@ -8445,14 +8442,6 @@ public sealed class MinecraftLauncherService
             args.Add("--add-opens=java.base/java.util=ALL-UNNAMED");
         }
         
-        // Security & Cleanup
-        args.Add("-Dlog4j2.formatMsgNoLookups=true");
-        
-        // Fix encoding issues in logs/console
-        args.Add("-Dsun.stdout.encoding=UTF-8");
-        args.Add("-Dsun.stderr.encoding=UTF-8");
-        args.Add("-Dfile.encoding=UTF-8");
-
         // For 1.16.5 offline mode, we need to ensure the multiplayer button is enabled.
         // If we have Ely.by Authlib, it usually handles this, but we'll add the force flag.
         if (options.MicrosoftSession == null && options.Version.Id.Contains("1.16.5", StringComparison.OrdinalIgnoreCase))

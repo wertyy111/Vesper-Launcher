@@ -194,6 +194,7 @@ public partial class MainWindow : Window
         new LauncherJavaRuntimeOption(false, "Своя Java / JRE")
     ];
     private readonly MinecraftLauncherService _launcherService = new();
+    private readonly VersionStateMachine _versionStateMachine = new();
     private readonly Logger _launcherLogger = new("launcher");
     private readonly string _launcherLogPath;
     private readonly string _savedUsernamesPath;
@@ -4874,9 +4875,38 @@ public partial class MainWindow : Window
             return;
         }
 
-        LaunchButtonText.Text = _gameProcessMonitor.IsRunning
-            ? "Закрыть"
-            : HasLaunchIdentity() ? "Играть" : "Войти";
+        if (_gameProcessMonitor.IsRunning)
+        {
+            LaunchButtonText.Text = "Закрыть";
+            return;
+        }
+
+        if (!HasLaunchIdentity())
+        {
+            LaunchButtonText.Text = "Войти";
+            return;
+        }
+
+        LaunchButtonText.Text = ResolveSelectedVersionState().ButtonText;
+    }
+
+    private VersionState ResolveSelectedVersionState()
+    {
+        if (_selectedVersionChoice is null)
+        {
+            return VersionState.NotInstalled;
+        }
+
+        return _versionStateMachine.GetState(
+            ResolveCurrentProfileDirectory(),
+            _selectedVersionChoice.Version);
+    }
+
+    private VersionState ResolveVersionStateForChoice(VersionSelectionEntry choice)
+    {
+        return _versionStateMachine.GetState(
+            ResolveCurrentProfileDirectory(),
+            choice.Version);
     }
 
     private void EnsureFirstRunCleanState()
@@ -7381,6 +7411,7 @@ public partial class MainWindow : Window
         }
 
         UpdateVersionSelectionLabels(selectedChoice);
+        UpdateLaunchButtonIdleState();
         UpdateProfilePathLabel();
         RefreshModsSection();
     }
