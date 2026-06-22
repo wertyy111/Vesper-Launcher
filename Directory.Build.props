@@ -2,5 +2,11 @@
   <PropertyGroup>
     <RestorePackagesPath>$(MSBuildThisFileDirectory).nuget\packages</RestorePackagesPath>
     <NuGetAudit>false</NuGetAudit>
+    <DefaultItemExcludes>$(DefaultItemExcludes);$(MSBuildProjectDirectory)\bin\**;$(MSBuildProjectDirectory)\obj\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(VESPER_USER_BUILD_ROOT)' != ''">
+    <BaseIntermediateOutputPath>$(VESPER_USER_BUILD_ROOT)\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(VESPER_USER_BUILD_ROOT)\bin\$(MSBuildProjectName)\</BaseOutputPath>
   </PropertyGroup>
 </Project>
