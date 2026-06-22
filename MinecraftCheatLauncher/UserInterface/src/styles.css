@@ -2099,6 +2099,7 @@ img { display: block; max-width: 100%; }
 .settings-pages-stack {
   position: relative;
   min-height: 420px;
+  overflow: hidden;
 }
 
 .settings-tab-page {
@@ -2107,6 +2108,8 @@ img { display: block; max-width: 100%; }
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
+  transform: translate3d(120vw, 0, 0);
+  transition: none;
 }
 
 .settings-tab-page.active {
@@ -2114,6 +2117,7 @@ img { display: block; max-width: 100%; }
   visibility: visible;
   opacity: 1;
   pointer-events: auto;
+  transform: translate3d(0, 0, 0);
 }
 
 .launcher-settings-side-panel .wpf-form-row {
