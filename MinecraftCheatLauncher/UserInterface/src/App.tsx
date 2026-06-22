@@ -21,7 +21,7 @@ const BOTTOM_SECTION_ITEMS = [
 ];
 
 const WPF_WIDE_PANEL_SECTIONS = new Set(['account', 'settings', ...BOTTOM_SECTION_ITEMS.map((section) => section.id)]);
-const SETTINGS_WIDTH_PANEL_SECTIONS = new Set(['settings', ...BOTTOM_SECTION_ITEMS.map((section) => section.id)]);
+const SETTINGS_WIDTH_PANEL_SECTIONS = new Set(['account', 'settings', ...BOTTOM_SECTION_ITEMS.map((section) => section.id)]);
 
 const DEFAULT_GLASS_TUNING: GlassTuningSettings = {
   refraction: 0.014,
