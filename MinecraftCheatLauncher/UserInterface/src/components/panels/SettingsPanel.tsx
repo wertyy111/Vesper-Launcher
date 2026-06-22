@@ -43,6 +43,8 @@ export function SettingsPanel({ launcher, javaPathDraft, setJavaPathDraft, setJa
   const memoryRange = Math.max(maximumMemoryMb - minimumMemoryMb, 1);
   const memoryRangeProgress = ((memorySliderValue - minimumMemoryMb) / memoryRange) * 100;
   const memoryRangeStyle = { '--range-progress': `${memoryRangeProgress}%` } as CSSProperties;
+  const pageClass = (tabId: string) => `wpf-settings-page settings-tab-page ${activeTab === tabId ? 'active' : ''}`;
+  const isPageHidden = (tabId: string) => activeTab !== tabId;
   const commitMemoryMb = (value: number) => {
     if (isAutoMemoryEnabled) return;
 
@@ -76,8 +78,8 @@ export function SettingsPanel({ launcher, javaPathDraft, setJavaPathDraft, setJa
           ))}
         </div>
 
-        {activeTab === 'launcher' ? (
-          <div className="wpf-settings-page">
+        <div className="settings-pages-stack">
+          <div className={pageClass('launcher')} aria-hidden={isPageHidden('launcher')}>
             <h3 className="settings-page-title">Лаунчер</h3>
             <InlineSelectField label="Форма входа:" value={settings.loginFormPlacementId ?? 'center'} options={(settings.loginPlacementOptions ?? []) as Array<Record<string, any>>} onChange={(value) => photinoBridge.sendCommand('settings.setOption', { field: 'loginFormPlacementId', value })} />
             <div className="wpf-form-row">
@@ -100,10 +102,8 @@ export function SettingsPanel({ launcher, javaPathDraft, setJavaPathDraft, setJa
             </div>
             <InlineSelectField label="Папки:" value={settings.launcherDirectoryViewId ?? 'current'} options={(settings.directoryViewOptions ?? []) as Array<Record<string, any>>} onChange={(value) => photinoBridge.sendCommand('settings.setOption', { field: 'launcherDirectoryViewId', value })} />
           </div>
-        ) : null}
 
-        {activeTab === 'java' ? (
-          <div className="wpf-settings-page">
+          <div className={pageClass('java')} aria-hidden={isPageHidden('java')}>
             <h3 className="settings-page-title">Java</h3>
             <div className="settings-toggle-row">
               <div>
@@ -132,19 +132,15 @@ export function SettingsPanel({ launcher, javaPathDraft, setJavaPathDraft, setJa
               />
             </label>
           </div>
-        ) : null}
 
-        {activeTab === 'vesper' ? (
-          <div className="wpf-settings-page">
+          <div className={pageClass('vesper')} aria-hidden={isPageHidden('vesper')}>
             <h3 className="settings-page-title">Vesper</h3>
             <ToggleCard label="Свернуть после запуска" hint={settings.autoMinimizeHint} checked={Boolean(settings.autoMinimizeOnLaunch)} onChange={(value) => photinoBridge.sendCommand('settings.setToggle', { field: 'autoMinimizeOnLaunch', value })} />
             <ToggleCard label="Вернуть окно после выхода" hint={settings.restoreHint} checked={Boolean(settings.restoreLauncherAfterGameExit)} onChange={(value) => photinoBridge.sendCommand('settings.setToggle', { field: 'restoreLauncherAfterGameExit', value })} />
             <ToggleCard label="Звуки интерфейса" hint="Звуки кнопок лаунчера." checked={Boolean(settings.clickSoundEnabled)} onChange={(value) => photinoBridge.sendCommand('settings.setToggle', { field: 'clickSoundEnabled', value })} />
           </div>
-        ) : null}
 
-        {activeTab === 'launch' ? (
-          <div className="wpf-settings-page">
+          <div className={pageClass('launch')} aria-hidden={isPageHidden('launch')}>
             <h3 className="settings-page-title">Запуск</h3>
             <ToggleCard label="Авто память" hint={settings.autoMemoryHint} checked={isAutoMemoryEnabled} onChange={(value) => photinoBridge.sendCommand('settings.setToggle', { field: 'autoOptimizeMemory', value })} />
             <label className="field-label">
@@ -193,17 +189,13 @@ export function SettingsPanel({ launcher, javaPathDraft, setJavaPathDraft, setJa
               </label>
             ) : null}
           </div>
-        ) : null}
 
-        {activeTab === 'language' ? (
-          <div className="wpf-settings-page">
+          <div className={pageClass('language')} aria-hidden={isPageHidden('language')}>
             <h3 className="settings-page-title">Язык</h3>
             <InlineSelectField label="Язык Minecraft" value={settings.minecraftLanguageCode ?? 'auto'} options={(settings.languageOptions ?? []) as Array<Record<string, any>>} onChange={(value) => photinoBridge.sendCommand('settings.setOption', { field: 'minecraftLanguageCode', value })} />
           </div>
-        ) : null}
 
-        {activeTab === 'glass' ? (
-          <div className="wpf-settings-page">
+          <div className={pageClass('glass')} aria-hidden={isPageHidden('glass')}>
             <h3 className="settings-page-title">Стекло</h3>
             <div className="glass-settings-list">
               {GLASS_SETTING_ITEMS.map((item) => {
@@ -227,7 +219,7 @@ export function SettingsPanel({ launcher, javaPathDraft, setJavaPathDraft, setJa
               })}
             </div>
           </div>
-        ) : null}
+        </div>
       </section>
     </>
   );

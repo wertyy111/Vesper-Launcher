@@ -2096,6 +2096,26 @@ img { display: block; max-width: 100%; }
   padding: 0 4px;
 }
 
+.settings-pages-stack {
+  position: relative;
+  min-height: 420px;
+}
+
+.settings-tab-page {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-tab-page.active {
+  position: relative;
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .launcher-settings-side-panel .wpf-form-row {
   grid-template-columns: 130px minmax(0, 1fr) 118px;
   gap: 10px;
