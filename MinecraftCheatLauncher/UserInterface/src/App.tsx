@@ -201,7 +201,11 @@ function App() {
         }
 
         const targets = Array.from(document.querySelectorAll<HTMLElement>('.liquid-glass-layer:not([data-liquid-initialized])'))
-          .filter((element) => element.offsetWidth > 0 && element.offsetHeight > 0);
+          .filter((element) =>
+            element.offsetWidth > 0 &&
+            element.offsetHeight > 0 &&
+            !element.classList.contains('settings-liquid-glass-layer') &&
+            !element.closest('.classic-side-panel'));
 
         if (!targets.length) {
           return;
@@ -236,7 +240,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [loadingState, activeSection, settings.activeTab, versionMenuOpen, glassTuning]);
+  }, [loadingState, versionMenuOpen]);
 
   useEffect(() => {
     const renderer = (window as any).__liquidGLRenderer__;
