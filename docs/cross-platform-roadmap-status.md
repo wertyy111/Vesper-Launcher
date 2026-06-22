@@ -32,6 +32,9 @@ Implemented:
 - `Core/EventManager.cs`
 - `Core/DependencyContainer.cs`
 - `Utils/PathHelper.cs`
+- `Utils/HashHelper.cs`
+- `Storage/FileManager.cs`
+- `Storage/CacheManager.cs`
 
 Not implemented yet:
 
@@ -57,8 +60,6 @@ Not implemented yet:
 - `SkinCache`
 - `SkinRenderer`
 - `SkinUploader`
-- `FileManager`
-- `CacheManager`
 - `DatabaseManager`
 - `IPlatformService`
 - `WindowsPlatformService`
@@ -66,7 +67,6 @@ Not implemented yet:
 - `MacOsPlatformService`
 - `PlatformProcessService`
 - `PlatformPathService`
-- `HashHelper`
 
 ## Stage 2: Stabilization Without Deepening WPF
 
