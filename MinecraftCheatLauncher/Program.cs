@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Photino.NET;
+using MinecraftCheatLauncher.Core;
 using MinecraftCheatLauncher.PhotinoHost;
 
 namespace MinecraftCheatLauncher;
@@ -32,7 +33,7 @@ internal static class Program
         WriteIndented = false
     };
 
-    private static readonly string HostLogPath = Path.Combine(AppContext.BaseDirectory, "photino-shell.log");
+    private static readonly Logger HostLogger = new("photino-shell");
 
     [STAThread]
     private static void Main(string[] args)
@@ -44,6 +45,7 @@ internal static class Program
                 TryWriteLog($"[{DateTime.Now:O}] FATAL{Environment.NewLine}{exception}{Environment.NewLine}");
             }
         };
+        HostLogger.Info(AppDiagnostics.Capture().ToLogText());
 
         using var backendHost = new LauncherWpfBackendHost();
         using var shutdown = new CancellationTokenSource();
@@ -646,14 +648,7 @@ internal static class Program
 
     private static void TryWriteLog(string entry)
     {
-        try
-        {
-            File.AppendAllText(HostLogPath, entry);
-        }
-        catch
-        {
-            // Ignore logging failures.
-        }
+        HostLogger.WriteRaw(entry);
     }
 
     [DllImport("user32.dll")]

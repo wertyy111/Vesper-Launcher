@@ -27,6 +27,7 @@ using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using BlurredBackgroundEffect = BlurredBackground.WPF.BlurredBackground;
 using Microsoft.Win32;
+using MinecraftCheatLauncher.Core;
 using MinecraftCheatLauncher.Launcher;
 using Open.Nat;
 
@@ -193,7 +194,8 @@ public partial class MainWindow : Window
         new LauncherJavaRuntimeOption(false, "Своя Java / JRE")
     ];
     private readonly MinecraftLauncherService _launcherService = new();
-    private readonly string _launcherLogPath = Path.Combine(AppContext.BaseDirectory, "launcher-errors.log");
+    private readonly Logger _launcherLogger = new("launcher");
+    private readonly string _launcherLogPath;
     private readonly string _savedUsernamesPath;
     private readonly string _friendsPath;
     private readonly string _uiStatePath;
@@ -572,6 +574,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _launcherLogPath = _launcherLogger.LogFilePath;
         CacheSettingsPanelDefaults();
         _savedUsernamesPath = GetLauncherDataFilePath("saved-usernames.json");
         _friendsPath = GetLauncherDataFilePath("friends.json");
@@ -13393,28 +13396,12 @@ public partial class MainWindow : Window
 
     private void TryWriteErrorToLog(Exception ex, string title)
     {
-        try
-        {
-            var entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {title}{Environment.NewLine}{ex}{Environment.NewLine}{new string('-', 70)}{Environment.NewLine}";
-            File.AppendAllText(_launcherLogPath, entry);
-        }
-        catch
-        {
-            // ignore
-        }
+        _launcherLogger.Error(ex, title);
     }
 
     private void TryWriteLauncherDiagnosticLog(string message)
     {
-        try
-        {
-            var entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}{new string('-', 70)}{Environment.NewLine}";
-            File.AppendAllText(_launcherLogPath, entry);
-        }
-        catch
-        {
-            // ignore
-        }
+        _launcherLogger.Info(message);
     }
 
     private void ShowError(Exception ex, string title)

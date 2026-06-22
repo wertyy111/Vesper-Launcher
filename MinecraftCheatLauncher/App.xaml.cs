@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using MinecraftCheatLauncher.Core;
 
 namespace MinecraftCheatLauncher;
 
@@ -9,7 +10,7 @@ public partial class App : Application
 {
     public static bool IsPhotinoBackendHost { get; set; }
 
-    private readonly string _appLogPath = Path.Combine(AppContext.BaseDirectory, "launcher-errors.log");
+    private readonly Logger _appLogger = new("app");
     private LauncherAutoUpdateService? _autoUpdateService;
     private bool _mainWindowShown;
     private StartupUpdateWindow? _startupUpdateWindow;
@@ -20,6 +21,7 @@ public partial class App : Application
         DispatcherUnhandledException += App_OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += AppDomain_OnUnhandledException;
         base.OnStartup(e);
+        _appLogger.Info(AppDiagnostics.Capture().ToLogText());
         TrySetShutdownMode(ShutdownMode.OnExplicitShutdown);
 
         if (IsPhotinoBackendHost)
@@ -270,27 +272,11 @@ public partial class App : Application
 
     private void TryWriteErrorToLog(Exception ex, string title)
     {
-        try
-        {
-            var entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {title}{Environment.NewLine}{ex}{Environment.NewLine}{new string('-', 70)}{Environment.NewLine}";
-            File.AppendAllText(_appLogPath, entry);
-        }
-        catch
-        {
-            // ignore
-        }
+        _appLogger.Error(ex, title);
     }
 
     private void TryWriteInfoToLog(string message)
     {
-        try
-        {
-            var entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}{new string('-', 70)}{Environment.NewLine}";
-            File.AppendAllText(_appLogPath, entry);
-        }
-        catch
-        {
-            // ignore
-        }
+        _appLogger.Info(message);
     }
 }
