@@ -29,8 +29,10 @@ This creates local packages only. Users will not receive an update.
 Output goes to:
 
 ```text
-%LOCALAPPDATA%\VesperLauncherBuild\velopack\<version>\Releases
+_build_verify\velopack\<version>\Releases
 ```
+
+The script also redirects its temporary packaging directory to the same build root so Velopack does not fill the system `%TEMP%` folder on `C:`.
 
 The user-facing installer is always normalized to one stable file name:
 

@@ -13,7 +13,7 @@ param(
     [string]$RepoUrl = 'https://github.com/wertyy111/Updates-Vesper',
     [string]$ReleaseName,
     [string]$TagName,
-    [string]$OutputRoot = '%LOCALAPPDATA%/VesperLauncherBuild/velopack',
+    [string]$OutputRoot,
     [string]$ReleaseNotesPath,
     [bool]$KeepOnlyLatest = $true,
     [bool]$PublishStableSetupAsset = $true,
@@ -309,10 +309,18 @@ if ([string]::IsNullOrWhiteSpace($safeVersion)) {
     throw 'Version must not be empty.'
 }
 
-$outputRootFullPath = Resolve-RepoRelativePath -RepoRoot $repoRoot -Path $OutputRoot
+$effectiveOutputRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    '_build_verify/velopack'
+}
+else {
+    $OutputRoot
+}
+
+$outputRootFullPath = Resolve-RepoRelativePath -RepoRoot $repoRoot -Path $effectiveOutputRoot
 $releaseRoot = Join-Path $outputRootFullPath $safeVersion
 $publishDirectory = Join-Path $releaseRoot "publish-$RuntimeIdentifier"
 $releasesDirectory = Join-Path $releaseRoot 'Releases'
+$buildTempDirectory = Join-Path $releaseRoot 'temp'
 $iconPath = Resolve-NormalizedPath (Join-Path $repoRoot 'MinecraftCheatLauncher/Assets/vesper-app.ico')
 
 if ($SkipPreviousDownload -and (Test-Path -LiteralPath $releasesDirectory)) {
@@ -325,7 +333,12 @@ if ($SkipPreviousDownload -and (Test-Path -LiteralPath $releasesDirectory)) {
     Remove-Item -LiteralPath $resolvedReleasesDirectory -Recurse -Force
 }
 
-New-Item -ItemType Directory -Path $releaseRoot, $publishDirectory, $releasesDirectory -Force | Out-Null
+New-Item -ItemType Directory -Path $releaseRoot, $publishDirectory, $releasesDirectory, $buildTempDirectory -Force | Out-Null
+
+$previousTemp = $env:TEMP
+$previousTmp = $env:TMP
+$env:TEMP = $buildTempDirectory
+$env:TMP = $buildTempDirectory
 
 Write-Host "Publishing Vesper Launcher $safeVersion for $RuntimeIdentifier..."
 $publishArguments = @(
@@ -452,3 +465,17 @@ else {
 
 Write-Host ''
 Write-Host "Release output: $releasesDirectory"
+
+if ($null -eq $previousTemp) {
+    Remove-Item Env:TEMP -ErrorAction SilentlyContinue
+}
+else {
+    $env:TEMP = $previousTemp
+}
+
+if ($null -eq $previousTmp) {
+    Remove-Item Env:TMP -ErrorAction SilentlyContinue
+}
+else {
+    $env:TMP = $previousTmp
+}
