@@ -9,6 +9,7 @@ param(
     [string]$PackTitle = 'Vesper Launcher',
     [string]$PackAuthors = 'Vesper Launcher',
     [string]$MainExe = 'MinecraftCheatLauncher.exe',
+    [string]$SetupFileName = 'VesperLauncherSetup.exe',
     [string]$RepoUrl = 'https://github.com/wertyy111/Updates-Vesper',
     [string]$OutputRoot = '%LOCALAPPDATA%/VesperLauncherBuild/velopack',
     [string]$ReleaseNotesPath,
@@ -90,6 +91,42 @@ function Ensure-VpkTokenForUpload {
     ) -join [Environment]::NewLine
 }
 
+function Rename-SetupPackage {
+    param(
+        [Parameter(Mandatory = $true)][string]$ReleasesDirectory,
+        [Parameter(Mandatory = $true)][string]$SetupFileName
+    )
+
+    $safeSetupFileName = [System.IO.Path]::GetFileName($SetupFileName)
+    if ([string]::IsNullOrWhiteSpace($safeSetupFileName) -or $safeSetupFileName -ne $SetupFileName) {
+        throw 'SetupFileName must be a file name without directory separators.'
+    }
+
+    $targetPath = Join-Path $ReleasesDirectory $safeSetupFileName
+    $setupCandidates = Get-ChildItem -LiteralPath $ReleasesDirectory -Filter '*-Setup.exe' -File |
+        Sort-Object LastWriteTimeUtc -Descending
+
+    $source = $setupCandidates | Where-Object {
+        -not [string]::Equals($_.FullName, $targetPath, [System.StringComparison]::OrdinalIgnoreCase)
+    } | Select-Object -First 1
+
+    if ($null -eq $source) {
+        if (Test-Path -LiteralPath $targetPath -PathType Leaf) {
+            Write-Host "Setup package already uses stable name: $safeSetupFileName"
+            return
+        }
+
+        throw "Velopack setup package was not found in $ReleasesDirectory."
+    }
+
+    if (Test-Path -LiteralPath $targetPath -PathType Leaf) {
+        Remove-Item -LiteralPath $targetPath -Force
+    }
+
+    Move-Item -LiteralPath $source.FullName -Destination $targetPath -Force
+    Write-Host "Stable setup package: $targetPath"
+}
+
 $repoRoot = Resolve-NormalizedPath (Join-Path $PSScriptRoot '..')
 $projectFullPath = Resolve-NormalizedPath (Join-Path $repoRoot $ProjectPath)
 if (-not (Test-Path -LiteralPath $projectFullPath -PathType Leaf)) {
@@ -116,6 +153,16 @@ $releaseRoot = Join-Path $outputRootFullPath $safeVersion
 $publishDirectory = Join-Path $releaseRoot "publish-$RuntimeIdentifier"
 $releasesDirectory = Join-Path $releaseRoot 'Releases'
 $iconPath = Resolve-NormalizedPath (Join-Path $repoRoot 'MinecraftCheatLauncher/Assets/vesper-app.ico')
+
+if ($SkipPreviousDownload -and (Test-Path -LiteralPath $releasesDirectory)) {
+    $resolvedReleasesDirectory = Resolve-NormalizedPath $releasesDirectory
+    $resolvedOutputRoot = Resolve-NormalizedPath $outputRootFullPath
+    if (-not $resolvedReleasesDirectory.StartsWith($resolvedOutputRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to clean unexpected Velopack releases directory: $resolvedReleasesDirectory"
+    }
+
+    Remove-Item -LiteralPath $resolvedReleasesDirectory -Recurse -Force
+}
 
 New-Item -ItemType Directory -Path $releaseRoot, $publishDirectory, $releasesDirectory -Force | Out-Null
 
@@ -181,6 +228,7 @@ if (-not [string]::IsNullOrWhiteSpace($ReleaseNotesPath)) {
 }
 
 Invoke-RepoDotnet -RepoRoot $repoRoot -Arguments $packArguments
+Rename-SetupPackage -ReleasesDirectory $releasesDirectory -SetupFileName $SetupFileName
 
 if ($Publish -or $UploadDraft) {
     Ensure-VpkTokenForUpload

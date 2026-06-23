@@ -32,6 +32,14 @@ Output goes to:
 %LOCALAPPDATA%\VesperLauncherBuild\velopack\<version>\Releases
 ```
 
+The user-facing installer is always normalized to one stable file name:
+
+```text
+VesperLauncherSetup.exe
+```
+
+Velopack update packages inside the same folder can still contain versions in their metadata and package names. Do not rename `.nupkg`, `RELEASES`, or `releases.win.json` manually.
+
 ## Draft upload
 
 This uploads a GitHub draft release, still not visible to normal users.
@@ -54,6 +62,12 @@ $env:VPK_TOKEN = "YOUR_FINE_GRAINED_UPDATES_REPO_TOKEN"
 .\scripts\Publish-VelopackUpdate.ps1 `
   -Publish `
   -RepoUrl "https://github.com/wertyy111/Updates-Vesper"
+```
+
+After publishing, the public installer link should stay stable:
+
+```text
+https://github.com/wertyy111/Updates-Vesper/releases/latest/download/VesperLauncherSetup.exe
 ```
 
 ## Client config
