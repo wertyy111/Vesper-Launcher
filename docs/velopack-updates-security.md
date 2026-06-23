@@ -40,7 +40,21 @@ The user-facing installer is always normalized to one stable file name:
 VesperLauncherSetup.exe
 ```
 
-Velopack update packages inside the same folder can still contain versions in their metadata and package names. Do not rename `.nupkg`, `RELEASES`, or `releases.win.json` manually.
+Velopack update packages inside the same folder still contain the real SemVer package version in metadata. Do not edit the `Version` field inside `releases.win.json` manually, because Velopack uses it to compare updates.
+
+For public beta releases, keep GitHub names clean and human-readable. Example:
+
+```powershell
+.\scripts\Publish-VelopackUpdate.ps1 `
+  -Publish `
+  -PreRelease `
+  -RepoUrl "https://github.com/wertyy111/Updates-Vesper" `
+  -TagName "beta-1.0" `
+  -ReleaseName "Vesper Launcher beta 1.0" `
+  -PublicPackageFileName "Vesper.Launcher-beta-1.0-full.nupkg"
+```
+
+This keeps the public release page on `beta 1.0` naming while preserving the internal Velopack package version for safe update checks.
 
 ## Draft upload
 
@@ -78,6 +92,7 @@ By default, `Publish-VelopackUpdate.ps1` keeps only the newest published GitHub 
 - old tags are deleted when GitHub allows it;
 - the internal Velopack setup asset is removed from the release;
 - the public setup asset stays named `VesperLauncherSetup.exe`.
+- optional public package naming can hide technical package versions from the asset list.
 
 This prevents users from downloading old launcher builds from the updates repository. Velopack package metadata still contains the current package version internally.
 

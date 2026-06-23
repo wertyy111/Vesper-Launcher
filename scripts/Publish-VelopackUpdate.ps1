@@ -13,6 +13,7 @@ param(
     [string]$RepoUrl = 'https://github.com/wertyy111/Updates-Vesper',
     [string]$ReleaseName,
     [string]$TagName,
+    [string]$PublicPackageFileName,
     [string]$OutputRoot,
     [string]$ReleaseNotesPath,
     [bool]$KeepOnlyLatest = $true,
@@ -288,6 +289,52 @@ function Remove-OldGitHubReleases {
     }
 }
 
+function Rename-PublicPackageAsset {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoPath,
+        [Parameter(Mandatory = $true)][string]$TagName,
+        [Parameter(Mandatory = $true)][string]$ReleasesDirectory,
+        [Parameter(Mandatory = $true)][string]$OldPackageFileName,
+        [Parameter(Mandatory = $true)][string]$NewPackageFileName
+    )
+
+    $safePackageFileName = [System.IO.Path]::GetFileName($NewPackageFileName)
+    if ([string]::IsNullOrWhiteSpace($safePackageFileName) -or $safePackageFileName -ne $NewPackageFileName) {
+        throw 'PublicPackageFileName must be a file name without directory separators.'
+    }
+
+    if (-not $safePackageFileName.EndsWith('.nupkg', [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'PublicPackageFileName must end with .nupkg.'
+    }
+
+    $encodedTag = [Uri]::EscapeDataString($TagName)
+    $release = Invoke-GitHubApi -Method 'GET' -Uri "https://api.github.com/repos/$RepoPath/releases/tags/$encodedTag"
+    $asset = @($release.assets) | Where-Object { $_.name -eq $OldPackageFileName } | Select-Object -First 1
+    if ($null -eq $asset) {
+        Write-Host "Package asset already renamed or missing: $OldPackageFileName"
+    }
+    else {
+        Invoke-GitHubApi -Method 'PATCH' -Uri $asset.url -Body @{ name = $safePackageFileName } | Out-Null
+        Write-Host "Renamed public package asset: $safePackageFileName"
+    }
+
+    $releaseIndexPath = Join-Path $ReleasesDirectory 'releases.win.json'
+    $legacyIndexPath = Join-Path $ReleasesDirectory 'RELEASES'
+    foreach ($indexPath in @($releaseIndexPath, $legacyIndexPath)) {
+        if (-not (Test-Path -LiteralPath $indexPath -PathType Leaf)) {
+            throw "Velopack index file not found: $indexPath"
+        }
+
+        $content = [System.IO.File]::ReadAllText($indexPath)
+        [System.IO.File]::WriteAllText($indexPath, $content.Replace($OldPackageFileName, $safePackageFileName))
+    }
+
+    $release = Invoke-GitHubApi -Method 'GET' -Uri "https://api.github.com/repos/$RepoPath/releases/tags/$encodedTag"
+    Upload-GitHubReleaseAsset -Release $release -AssetPath $releaseIndexPath
+    $release = Invoke-GitHubApi -Method 'GET' -Uri "https://api.github.com/repos/$RepoPath/releases/tags/$encodedTag"
+    Upload-GitHubReleaseAsset -Release $release -AssetPath $legacyIndexPath
+}
+
 $repoRoot = Resolve-NormalizedPath (Join-Path $PSScriptRoot '..')
 $projectFullPath = Resolve-NormalizedPath (Join-Path $repoRoot $ProjectPath)
 if (-not (Test-Path -LiteralPath $projectFullPath -PathType Leaf)) {
@@ -450,6 +497,15 @@ if ($Publish -or $UploadDraft) {
             -TagName $effectiveTagName `
             -StableSetupPath $stableSetupPath `
             -OriginalSetupName $internalSetupName
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PublicPackageFileName)) {
+        Rename-PublicPackageAsset `
+            -RepoPath $repoPath `
+            -TagName $effectiveTagName `
+            -ReleasesDirectory $releasesDirectory `
+            -OldPackageFileName "$PackId-$safeVersion-full.nupkg" `
+            -NewPackageFileName $PublicPackageFileName.Trim()
     }
 
     if ($Publish -and $KeepOnlyLatest) {
