@@ -2,7 +2,6 @@ import { startTransition, useEffect, useLayoutEffect, useRef, useState, type CSS
 import { photinoBridge } from './bridge';
 import type { GlassTuningSettings, HostSnapshot, PanelRenderProps } from './types';
 
-import { LoadingScreen } from './components/common/LoadingScreen';
 import { AccountPanel } from './components/panels/AccountPanel';
 import { SettingsPanel } from './components/panels/SettingsPanel';
 import { SkinPanel } from './components/panels/SkinPanel';
@@ -305,14 +304,16 @@ function App() {
   const isSettingsWidthSidePanel = !loadingState && SETTINGS_WIDTH_PANEL_SECTIONS.has(activeSection);
   const isLauncherSettingsPanel = !loadingState && activeSection === 'settings';
 
-  const panelProps: PanelRenderProps = {
-    launcher: launcher!, accountForm, setAccountForm, setAccountDirty, submitAccount,
-    friendDraft, setFriendDraft, setFriendDirty,
-    javaPathDraft, setJavaPathDraft, setJavaPathDirty,
-    jvmArgsDraft, setJvmArgsDraft, setJvmArgsDirty,
-    toggleSelectedMod,
-    glassTuning, setGlassTuningValue
-  };
+  const panelProps: PanelRenderProps | null = launcher
+    ? {
+        launcher, accountForm, setAccountForm, setAccountDirty, submitAccount,
+        friendDraft, setFriendDraft, setFriendDirty,
+        javaPathDraft, setJavaPathDraft, setJavaPathDirty,
+        jvmArgsDraft, setJvmArgsDraft, setJvmArgsDirty,
+        toggleSelectedMod,
+        glassTuning, setGlassTuningValue
+      }
+    : null;
 
   return (
     <div className="app-shell" style={{ background: pageBackground }}>
@@ -340,10 +341,7 @@ function App() {
           </div>
         </header>
 
-        {loadingState ? (
-          <LoadingScreen hostSnapshot={hostSnapshot} runtimeError={runtimeError} />
-        ) : (
-          <div className="classic-workspace">
+        <div className="classic-workspace">
             <div className="classic-main-grid">
               <aside className="left-control-surface">
                 <div className="left-control-surface-bg glass-panel" />
@@ -440,7 +438,7 @@ function App() {
                   </div>
 
                   <div className="left-panel-bottom">
-                    <p className="status-text">{main.statusText || hostSnapshot?.update?.message || 'Готов к запуску'}</p>
+                    <p className="status-text">{main.statusText || runtimeError || hostSnapshot?.update?.message || 'Готов к запуску'}</p>
                     <p className="progress-text">{main.progressText || hostSnapshot?.update?.detailMessage || 'Ожидание...'}</p>
                     <div className="classic-progress">
                       <div className={`classic-progress-fill ${main.isProgressIndeterminate ? 'indeterminate' : ''}`} style={{ width: `${progressPercent}%` }} />
@@ -451,7 +449,7 @@ function App() {
               </aside>
 
               <aside className={`sidepanel classic-side-panel glass-panel ${rightPanelVisible ? 'visible' : ''} ${isWideSidePanel ? 'wide-section-panel' : ''} ${isSettingsWidthSidePanel ? 'settings-section-panel' : ''} ${isLauncherSettingsPanel ? 'launcher-settings-side-panel' : ''}`}>
-                {renderPanel(panelProps)}
+                {panelProps ? renderPanel(panelProps) : null}
               </aside>
 
               <nav className="bottom-action-bar">
@@ -459,7 +457,7 @@ function App() {
                 {BOTTOM_SECTION_ITEMS.map((section) => (
                   <button
                     key={section.id}
-                    className={`main-glass-button ${launcher.activeSection === section.id ? 'active' : ''} left-liquid-glass-button`}
+                    className={`main-glass-button ${launcher?.activeSection === section.id ? 'active' : ''} left-liquid-glass-button`}
                     data-liquid-label={section.label}
                     onClick={() => openSection(section.id)}
                     type="button"
@@ -471,7 +469,6 @@ function App() {
               </nav>
             </div>
           </div>
-        )}
       </div>
     </div>
   );
