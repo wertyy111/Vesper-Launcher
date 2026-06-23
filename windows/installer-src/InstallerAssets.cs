@@ -8,112 +8,109 @@ using System.Text;
 
 internal static class InstallerAssets
 {
-	public static Image? LoadHeroImage()
-	{
-		try
-		{
-			Assembly executingAssembly = Assembly.GetExecutingAssembly();
-			string text = executingAssembly.GetManifestResourceNames().FirstOrDefault((string name) => name.EndsWith("vesper-launcher-wordmark.png", StringComparison.OrdinalIgnoreCase) || name.EndsWith("vesper-launcher-wordmark.jpg", StringComparison.OrdinalIgnoreCase) || name.EndsWith("vesper-launcher-wordmark.jpeg", StringComparison.OrdinalIgnoreCase));
-			if (text == null)
-			{
-				return null;
-			}
-			using Stream stream = executingAssembly.GetManifestResourceStream(text);
-			if (stream == null)
-			{
-				return null;
-			}
-			return new Bitmap(stream);
-		}
-		catch
-		{
-			return null;
-		}
-	}
+    public static Image? LoadHeroImage()
+    {
+        return LoadImageResource("vesper-launcher-wordmark.png", "vesper-launcher-wordmark.jpg", "vesper-launcher-wordmark.jpeg");
+    }
 
-	public static string LoadLicenseText()
-	{
-		try
-		{
-			Assembly executingAssembly = Assembly.GetExecutingAssembly();
-			string text = executingAssembly.GetManifestResourceNames().FirstOrDefault((string name) => name.EndsWith("installer-license.txt", StringComparison.OrdinalIgnoreCase) || name.EndsWith("license.txt", StringComparison.OrdinalIgnoreCase));
-			if (text == null)
-			{
-				return GetBundledFallbackLicenseText();
-			}
-			using Stream stream = executingAssembly.GetManifestResourceStream(text);
-			if (stream == null)
-			{
-				return GetBundledFallbackLicenseText();
-			}
-			using StreamReader streamReader = new StreamReader(stream);
-			return streamReader.ReadToEnd();
-		}
-		catch
-		{
-			return GetBundledFallbackLicenseText();
-		}
-	}
+    public static Image? LoadLogoImage()
+    {
+        var image = LoadImageResource("vesper-logo.png", "vesper-logo.jpg", "vesper-logo.jpeg");
+        if (image is not Bitmap bitmap)
+        {
+            return image;
+        }
 
-	public static void WriteLicenseFile(string installDir)
-	{
-		Directory.CreateDirectory(installDir);
-		File.WriteAllText(Path.Combine(installDir, "LICENSE.txt"), LoadLicenseText(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
-	}
+        if (bitmap.PixelFormat == PixelFormat.Format32bppArgb || bitmap.PixelFormat == PixelFormat.Format64bppArgb)
+        {
+            return bitmap;
+        }
 
-	public static Image? LoadLogoImage()
-	{
-		try
-		{
-			Assembly executingAssembly = Assembly.GetExecutingAssembly();
-			string text = executingAssembly.GetManifestResourceNames().FirstOrDefault((string name) => name.EndsWith("vesper-logo.png", StringComparison.OrdinalIgnoreCase) || name.EndsWith("vesper-logo.jpg", StringComparison.OrdinalIgnoreCase) || name.EndsWith("vesper-logo.jpeg", StringComparison.OrdinalIgnoreCase));
-			if (text == null)
-			{
-				return null;
-			}
-			using Stream stream = executingAssembly.GetManifestResourceStream(text);
-			if (stream == null)
-			{
-				return null;
-			}
-			Bitmap bitmap = new Bitmap(stream);
-			if (bitmap.PixelFormat == PixelFormat.Format32bppArgb || bitmap.PixelFormat == PixelFormat.Format64bppArgb)
-			{
-				return bitmap;
-			}
-			return RemoveBackgroundByCornerColor(bitmap);
-		}
-		catch
-		{
-			return null;
-		}
-	}
+        return RemoveBackgroundByCornerColor(bitmap);
+    }
 
-	private static Bitmap RemoveBackgroundByCornerColor(Bitmap source)
-	{
-		Bitmap bitmap = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
-		Color pixel = source.GetPixel(0, 0);
-		for (int i = 0; i < source.Height; i++)
-		{
-			for (int j = 0; j < source.Width; j++)
-			{
-				Color pixel2 = source.GetPixel(j, i);
-				if (Math.Abs(pixel2.R - pixel.R) + Math.Abs(pixel2.G - pixel.G) + Math.Abs(pixel2.B - pixel.B) <= 95)
-				{
-					bitmap.SetPixel(j, i, Color.FromArgb(0, pixel2.R, pixel2.G, pixel2.B));
-				}
-				else
-				{
-					bitmap.SetPixel(j, i, Color.FromArgb(255, pixel2.R, pixel2.G, pixel2.B));
-				}
-			}
-		}
-		source.Dispose();
-		return bitmap;
-	}
+    public static string LoadLicenseText()
+    {
+        try
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            var resourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(name =>
+                    name.EndsWith("installer-license.txt", StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith("license.txt", StringComparison.OrdinalIgnoreCase));
 
-	private static string GetBundledFallbackLicenseText()
-	{
-		return "Лицензионное соглашение Vesper Launcher" + Environment.NewLine + Environment.NewLine + "Устанавливая или используя Vesper Launcher, ты принимаешь условия лицензии, приложенной к этому приложению.";
-	}
+            if (resourceName is null)
+            {
+                return GetBundledFallbackLicenseText();
+            }
+
+            using var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream is null)
+            {
+                return GetBundledFallbackLicenseText();
+            }
+
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        catch
+        {
+            return GetBundledFallbackLicenseText();
+        }
+    }
+
+    public static void WriteLicenseFile(string installDir)
+    {
+        Directory.CreateDirectory(installDir);
+        File.WriteAllText(Path.Combine(installDir, "LICENSE.txt"), LoadLicenseText(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+    }
+
+    private static Image? LoadImageResource(params string[] endings)
+    {
+        try
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            var resourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(name => endings.Any(ending => name.EndsWith(ending, StringComparison.OrdinalIgnoreCase)));
+
+            if (resourceName is null)
+            {
+                return null;
+            }
+
+            using var stream = assembly.GetManifestResourceStream(resourceName);
+            return stream is null ? null : new Bitmap(stream);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static Bitmap RemoveBackgroundByCornerColor(Bitmap source)
+    {
+        var bitmap = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
+        var corner = source.GetPixel(0, 0);
+        for (var y = 0; y < source.Height; y++)
+        {
+            for (var x = 0; x < source.Width; x++)
+            {
+                var pixel = source.GetPixel(x, y);
+                var distance = Math.Abs(pixel.R - corner.R) + Math.Abs(pixel.G - corner.G) + Math.Abs(pixel.B - corner.B);
+                var alpha = distance <= 95 ? 0 : 255;
+                bitmap.SetPixel(x, y, Color.FromArgb(alpha, pixel.R, pixel.G, pixel.B));
+            }
+        }
+
+        source.Dispose();
+        return bitmap;
+    }
+
+    private static string GetBundledFallbackLicenseText()
+    {
+        return "Лицензионное соглашение Vesper Launcher" +
+            Environment.NewLine +
+            Environment.NewLine +
+            "Устанавливая или используя Vesper Launcher, ты принимаешь условия лицензии, приложенной к этому приложению.";
+    }
 }

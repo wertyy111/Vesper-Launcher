@@ -1,12 +1,10 @@
 [CmdletBinding()]
 param(
     [string]$ProjectPath = 'windows/installer-src/Installer.csproj',
-    [string]$LauncherProjectPath = 'MinecraftCheatLauncher/MinecraftCheatLauncher.csproj',
-    [string]$PayloadZipPath = '_windows_build/payload_latest.zip',
+    [string]$VelopackSetupPath,
     [string]$Configuration = 'Release',
     [string]$RuntimeIdentifier = 'win-x64',
-    [string]$OutputRoot = '_temp_build',
-    [switch]$SkipPayloadBuild,
+    [string]$OutputRoot = '_build_verify/setup-wrapper',
     [switch]$UpdateWindowsSetup
 )
 
@@ -19,113 +17,72 @@ function Resolve-NormalizedPath {
     return [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($Path))
 }
 
+function Resolve-RepoRelativePath {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $expanded = [Environment]::ExpandEnvironmentVariables($Path)
+    if ([System.IO.Path]::IsPathRooted($expanded)) {
+        return [System.IO.Path]::GetFullPath($expanded)
+    }
+
+    return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $expanded))
+}
+
+function Find-LatestVelopackSetup {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $releaseRoot = Join-Path $RepoRoot '_build_verify/velopack'
+    if (-not (Test-Path -LiteralPath $releaseRoot -PathType Container)) {
+        return $null
+    }
+
+    return Get-ChildItem -LiteralPath $releaseRoot -Filter 'Vesper.Launcher-win-Setup.exe' -File -Recurse |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1 -ExpandProperty FullName
+}
+
 $repoRoot = Resolve-NormalizedPath (Join-Path $PSScriptRoot '..')
-$projectFullPath = Resolve-NormalizedPath (Join-Path $repoRoot $ProjectPath)
-$launcherProjectFullPath = Resolve-NormalizedPath (Join-Path $repoRoot $LauncherProjectPath)
-$payloadZipFullPath = Resolve-NormalizedPath (Join-Path $repoRoot $PayloadZipPath)
-
+$projectFullPath = Resolve-RepoRelativePath -RepoRoot $repoRoot -Path $ProjectPath
 if (-not (Test-Path -LiteralPath $projectFullPath -PathType Leaf)) {
-    throw "Installer project not found: $projectFullPath"
+    throw "Installer wrapper project not found: $projectFullPath"
 }
 
-if (-not (Test-Path -LiteralPath $launcherProjectFullPath -PathType Leaf)) {
-    throw "Launcher project not found: $launcherProjectFullPath"
+$resolvedVelopackSetupPath = if ([string]::IsNullOrWhiteSpace($VelopackSetupPath)) {
+    Find-LatestVelopackSetup -RepoRoot $repoRoot
+}
+else {
+    Resolve-RepoRelativePath -RepoRoot $repoRoot -Path $VelopackSetupPath
 }
 
-[xml]$projectXml = Get-Content -LiteralPath $projectFullPath
-$version = $projectXml.Project.PropertyGroup.Version | Select-Object -First 1
-if ([string]::IsNullOrWhiteSpace($version)) {
-    throw "Version is missing in $projectFullPath"
+if ([string]::IsNullOrWhiteSpace($resolvedVelopackSetupPath) -or -not (Test-Path -LiteralPath $resolvedVelopackSetupPath -PathType Leaf)) {
+    throw 'Velopack setup was not found. Run Publish-VelopackUpdate.ps1 first or pass -VelopackSetupPath.'
 }
 
-$outputRootFullPath = Resolve-NormalizedPath (Join-Path $repoRoot $OutputRoot)
-$releaseRoot = Join-Path $outputRootFullPath "release_$version"
-$payloadPublishDirectory = Join-Path $releaseRoot 'launcher-payload-self-contained'
-$publishDirectory = Join-Path $releaseRoot 'installer-publish-singlefile'
-$setupFileName = "VesperLauncherSetup-$version.exe"
-$releaseSetupPath = Join-Path $releaseRoot $setupFileName
+$outputRootFullPath = Resolve-RepoRelativePath -RepoRoot $repoRoot -Path $OutputRoot
+$publishDirectory = Join-Path $outputRootFullPath 'publish'
+$intermediateDirectory = Join-Path $outputRootFullPath 'obj'
+$nugetPackages = Join-Path $repoRoot '_build_verify/dotnet/nuget'
 
-New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $publishDirectory, $intermediateDirectory, $nugetPackages -Force | Out-Null
 
-if (-not $SkipPayloadBuild) {
-    if (Test-Path -LiteralPath $payloadPublishDirectory) {
-        $resolvedPayloadPublishDirectory = Resolve-NormalizedPath $payloadPublishDirectory
-        $resolvedReleaseRoot = Resolve-NormalizedPath $releaseRoot
-        if (-not $resolvedPayloadPublishDirectory.StartsWith($resolvedReleaseRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Refusing to clean unexpected payload publish directory: $resolvedPayloadPublishDirectory"
-        }
+Write-Host "Building Vesper setup wrapper around:"
+Write-Host $resolvedVelopackSetupPath
 
-        Remove-Item -LiteralPath $resolvedPayloadPublishDirectory -Recurse -Force
-    }
-
-    New-Item -ItemType Directory -Path $payloadPublishDirectory -Force | Out-Null
-
-    Write-Host "Publishing launcher payload $version with bundled .NET runtime..."
-    & dotnet publish $launcherProjectFullPath `
-        -c $Configuration `
-        -r $RuntimeIdentifier `
-        --self-contained true `
-        -o $payloadPublishDirectory `
-        -nologo `
-        -p:PublishSingleFile=false `
-        -p:DebugType=none `
-        -p:DebugSymbols=false `
-        -p:SkipLockedLauncherCheck=true
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "launcher dotnet publish failed with exit code $LASTEXITCODE."
-    }
-
-    $payloadScriptPath = Join-Path $PSScriptRoot 'New-PayloadZip.ps1'
-    if (-not (Test-Path -LiteralPath $payloadScriptPath -PathType Leaf)) {
-        throw "Payload zip script not found: $payloadScriptPath"
-    }
-
-    Write-Host "Creating self-contained payload zip..."
-    & $payloadScriptPath `
-        -SourceDirectory $payloadPublishDirectory `
-        -DestinationZip $payloadZipFullPath | Write-Host
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "payload zip creation failed with exit code $LASTEXITCODE."
-    }
-}
-
-if (-not (Test-Path -LiteralPath $payloadZipFullPath -PathType Leaf)) {
-    throw "Installer payload not found: $payloadZipFullPath"
-}
-
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$payloadZip = [System.IO.Compression.ZipFile]::OpenRead($payloadZipFullPath)
-try {
-    $payloadEntryNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($entry in $payloadZip.Entries) {
-        if (-not [string]::IsNullOrWhiteSpace($entry.Name)) {
-            [void]$payloadEntryNames.Add($entry.Name)
-        }
-    }
-
-    foreach ($runtimeFileName in @('coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll')) {
-        if (-not $payloadEntryNames.Contains($runtimeFileName)) {
-            throw "Payload does not include bundled .NET runtime file '$runtimeFileName'. Build without -SkipPayloadBuild or use a self-contained launcher publish."
-        }
-    }
-}
-finally {
-    $payloadZip.Dispose()
-}
-
-Write-Host "Publishing installer $version as a single-file executable..."
 & dotnet publish $projectFullPath `
     -c $Configuration `
     -r $RuntimeIdentifier `
     --self-contained true `
     -o $publishDirectory `
     -nologo `
-    -p:PayloadZip="$payloadZipFullPath" `
     -p:PublishSingleFile=true `
     -p:IncludeNativeLibrariesForSelfExtract=true `
-    -p:EnableCompressionInSingleFile=true
+    -p:EnableCompressionInSingleFile=true `
+    "-p:VelopackSetup=$resolvedVelopackSetupPath" `
+    "-p:BaseIntermediateOutputPath=$intermediateDirectory/" `
+    "-p:RestorePackagesPath=$nugetPackages"
 
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE."
@@ -133,10 +90,8 @@ if ($LASTEXITCODE -ne 0) {
 
 $publishedSetupPath = Join-Path $publishDirectory 'VesperLauncherSetup.exe'
 if (-not (Test-Path -LiteralPath $publishedSetupPath -PathType Leaf)) {
-    throw "Published installer not found: $publishedSetupPath"
+    throw "Published setup wrapper not found: $publishedSetupPath"
 }
-
-Copy-Item -LiteralPath $publishedSetupPath -Destination $releaseSetupPath -Force
 
 if ($UpdateWindowsSetup) {
     $windowsSetupPath = Join-Path $repoRoot 'windows/setup.exe'
@@ -144,8 +99,7 @@ if ($UpdateWindowsSetup) {
     Write-Host "Updated: $windowsSetupPath"
 }
 
-$releaseSetupItem = Get-Item -LiteralPath $releaseSetupPath
+$item = Get-Item -LiteralPath $publishedSetupPath
 Write-Host ''
-Write-Host "Installer ready: $releaseSetupPath"
-Write-Host ("Size: {0:N0} bytes" -f $releaseSetupItem.Length)
-Write-Host ''
+Write-Host "Installer wrapper ready: $publishedSetupPath"
+Write-Host ("Size: {0:N0} bytes" -f $item.Length)

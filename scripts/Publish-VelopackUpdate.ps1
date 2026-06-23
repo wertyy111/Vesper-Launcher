@@ -10,6 +10,7 @@ param(
     [string]$PackAuthors = 'Vesper Launcher',
     [string]$MainExe = 'MinecraftCheatLauncher.exe',
     [string]$SetupFileName = 'VesperLauncherSetup.exe',
+    [string]$SetupWrapperProjectPath = 'windows/installer-src/Installer.csproj',
     [string]$RepoUrl = 'https://github.com/wertyy111/Updates-Vesper',
     [string]$ReleaseName,
     [string]$TagName,
@@ -19,6 +20,7 @@ param(
     [bool]$KeepOnlyLatest = $true,
     [bool]$PublishStableSetupAsset = $true,
     [bool]$ReplaceExistingRelease = $true,
+    [bool]$UseSetupWrapper = $true,
     [switch]$SkipFrontendBuild,
     [switch]$SkipPreviousDownload,
     [switch]$UploadDraft,
@@ -128,6 +130,58 @@ function Rename-SetupPackage {
 
     Copy-Item -LiteralPath $source.FullName -Destination $targetPath -Force
     Write-Host "Stable setup package: $targetPath"
+}
+
+function Build-SetupWrapper {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$WrapperProjectPath,
+        [Parameter(Mandatory = $true)][string]$InternalSetupPath,
+        [Parameter(Mandatory = $true)][string]$StableSetupPath,
+        [Parameter(Mandatory = $true)][string]$Configuration,
+        [Parameter(Mandatory = $true)][string]$RuntimeIdentifier,
+        [Parameter(Mandatory = $true)][string]$OutputDirectory,
+        [Parameter(Mandatory = $true)][string]$IntermediateDirectory
+    )
+
+    $wrapperProjectFullPath = Resolve-RepoRelativePath -RepoRoot $RepoRoot -Path $WrapperProjectPath
+    if (-not (Test-Path -LiteralPath $wrapperProjectFullPath -PathType Leaf)) {
+        throw "Setup wrapper project not found: $wrapperProjectFullPath"
+    }
+
+    if (-not (Test-Path -LiteralPath $InternalSetupPath -PathType Leaf)) {
+        throw "Internal Velopack setup not found: $InternalSetupPath"
+    }
+
+    if (Test-Path -LiteralPath $OutputDirectory) {
+        Remove-Item -LiteralPath $OutputDirectory -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Path $OutputDirectory, $IntermediateDirectory -Force | Out-Null
+    Write-Host "Building Vesper setup wrapper..."
+
+    Invoke-RepoDotnet -RepoRoot $RepoRoot -Arguments @(
+        'publish', $wrapperProjectFullPath,
+        '-c', $Configuration,
+        '-r', $RuntimeIdentifier,
+        '--self-contained', 'true',
+        '-o', $OutputDirectory,
+        '-nologo',
+        '-p:PublishSingleFile=true',
+        '-p:IncludeNativeLibrariesForSelfExtract=true',
+        '-p:EnableCompressionInSingleFile=true',
+        "-p:VelopackSetup=$InternalSetupPath",
+        "-p:BaseIntermediateOutputPath=$IntermediateDirectory/",
+        "-p:RestorePackagesPath=$env:NUGET_PACKAGES"
+    )
+
+    $publishedWrapperPath = Join-Path $OutputDirectory 'VesperLauncherSetup.exe'
+    if (-not (Test-Path -LiteralPath $publishedWrapperPath -PathType Leaf)) {
+        throw "Published setup wrapper not found: $publishedWrapperPath"
+    }
+
+    Copy-Item -LiteralPath $publishedWrapperPath -Destination $StableSetupPath -Force
+    Write-Host "Public setup wrapper: $StableSetupPath"
 }
 
 function Get-GitHubRepoPath {
@@ -393,6 +447,8 @@ $publishDirectory = Join-Path $releaseRoot "publish-$RuntimeIdentifier"
 $releasesDirectory = Join-Path $releaseRoot 'Releases'
 $buildTempDirectory = Join-Path $releaseRoot 'temp'
 $buildIntermediateDirectory = Join-Path $releaseRoot 'obj'
+$setupWrapperPublishDirectory = Join-Path $releaseRoot 'setup-wrapper-publish'
+$setupWrapperIntermediateDirectory = Join-Path $releaseRoot 'setup-wrapper-obj'
 $iconPath = Resolve-NormalizedPath (Join-Path $repoRoot 'MinecraftCheatLauncher/Assets/vesper-app.ico')
 
 if ($SkipPreviousDownload -and (Test-Path -LiteralPath $releasesDirectory)) {
@@ -476,6 +532,20 @@ if (-not [string]::IsNullOrWhiteSpace($ReleaseNotesPath)) {
 
 Invoke-RepoDotnet -RepoRoot $repoRoot -Arguments $packArguments
 Rename-SetupPackage -ReleasesDirectory $releasesDirectory -SetupFileName $SetupFileName
+$stableSetupPath = Join-Path $releasesDirectory $SetupFileName
+$internalSetupPath = Join-Path $releasesDirectory "$PackId-$Channel-Setup.exe"
+
+if ($UseSetupWrapper) {
+    Build-SetupWrapper `
+        -RepoRoot $repoRoot `
+        -WrapperProjectPath $SetupWrapperProjectPath `
+        -InternalSetupPath $internalSetupPath `
+        -StableSetupPath $stableSetupPath `
+        -Configuration $Configuration `
+        -RuntimeIdentifier $RuntimeIdentifier `
+        -OutputDirectory $setupWrapperPublishDirectory `
+        -IntermediateDirectory $setupWrapperIntermediateDirectory
+}
 
 if ($Publish -or $UploadDraft) {
     Ensure-VpkTokenForUpload
@@ -518,7 +588,6 @@ if ($Publish -or $UploadDraft) {
 
     Invoke-RepoDotnet -RepoRoot $repoRoot -Arguments $uploadArguments
 
-    $stableSetupPath = Join-Path $releasesDirectory $SetupFileName
     $internalSetupName = "$PackId-$Channel-Setup.exe"
 
     if ($PublishStableSetupAsset -and (Test-Path -LiteralPath $stableSetupPath -PathType Leaf)) {

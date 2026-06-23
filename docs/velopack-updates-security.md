@@ -46,7 +46,13 @@ The standard Velopack `Setup.exe` is a one-click installer. It does not show an 
 .\VesperLauncherSetup.exe --installto "D:\Games\Vesper Launcher"
 ```
 
-For a beautiful first-install experience, build a small Vesper-branded setup wrapper that lets the user choose a folder and then starts the Velopack setup with `--installto`. Do not replace the Velopack installation layout with a raw file-copy installer unless the launcher updater is changed too, because Velopack updates rely on its installed layout.
+For a beautiful first-install experience, the release script builds a Vesper-branded setup wrapper from `windows/installer-src`. The wrapper lets the user choose a folder and then starts the embedded Velopack setup with `--installto`. Do not replace the Velopack installation layout with a raw file-copy installer unless the launcher updater is changed too, because Velopack updates rely on its installed layout.
+
+To rebuild only the public wrapper around the latest local Velopack setup:
+
+```powershell
+.\scripts\Build-Installer.ps1
+```
 
 Velopack update packages inside the same folder still contain the real SemVer package version in metadata. Do not edit the `Version` field inside `releases.win.json` manually, because Velopack uses it to compare updates.
 
@@ -63,6 +69,8 @@ For public beta releases, keep GitHub names clean and human-readable. Example:
 ```
 
 This keeps the public release page on `beta 1.0` naming while preserving the internal Velopack package version for safe update checks.
+
+By default, `Publish-VelopackUpdate.ps1` also replaces the public `VesperLauncherSetup.exe` with the wrapper. The internal `Vesper.Launcher-win-Setup.exe` is uploaded only so Velopack can create the release correctly, then it is removed from the GitHub Release asset list.
 
 ## Draft upload
 

@@ -1,302 +1,299 @@
 using System;
+using System.ComponentModel;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal sealed class InstallerForm : Form
 {
-	private readonly InstallerOptions _startupOptions;
-	private readonly TextBox _pathTextBox = new TextBox();
-	private readonly Button _browseButton = new Button();
-	private readonly Button _installButton = new Button();
-	private readonly Button _cancelButton = new Button();
-	private readonly ProgressBar _progressBar = new ProgressBar();
-	private readonly Label _statusLabel = new Label();
-	private readonly CheckBox _desktopShortcutCheckBox = new CheckBox();
-	private readonly CheckBox _startMenuShortcutCheckBox = new CheckBox();
-	private readonly CheckBox _launchAfterInstallCheckBox = new CheckBox();
+    private readonly InstallerOptions _startupOptions;
+    private readonly TextBox _pathTextBox = new();
+    private readonly Button _browseButton = new();
+    private readonly Button _installButton = new();
+    private readonly Button _cancelButton = new();
+    private readonly ProgressBar _progressBar = new();
+    private readonly Label _statusLabel = new();
+    private readonly CheckBox _launchAfterInstallCheckBox = new();
 
-	public InstallerForm(InstallerOptions startupOptions)
-	{
-		_startupOptions = startupOptions;
+    public InstallerForm(InstallerOptions startupOptions)
+    {
+        _startupOptions = startupOptions;
 
-		SuspendLayout();
+        SuspendLayout();
 
-		Text = "Vesper Launcher Setup";
-		FormBorderStyle = FormBorderStyle.FixedDialog;
-		MaximizeBox = false;
-		MinimizeBox = false;
-		StartPosition = FormStartPosition.CenterScreen;
-		ClientSize = new Size(760, 470);
-		AutoScaleMode = AutoScaleMode.Dpi;
-		BackColor = SystemColors.Control;
-		ForeColor = SystemColors.ControlText;
-		Font = new Font("Segoe UI", 9f, FontStyle.Regular);
+        Text = "Vesper Launcher Setup";
+        FormBorderStyle = FormBorderStyle.FixedSingle;
+        MaximizeBox = false;
+        MinimizeBox = true;
+        StartPosition = FormStartPosition.CenterScreen;
+        ClientSize = new Size(780, 500);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        BackColor = Color.FromArgb(12, 18, 24);
+        ForeColor = Color.White;
+        Font = new Font("Segoe UI", 9f, FontStyle.Regular);
 
-		var headerPanel = new Panel
-		{
-			Dock = DockStyle.Top,
-			Height = 92,
-			BackColor = Color.White
-		};
+        var heroPanel = new GradientPanel
+        {
+            Left = 0,
+            Top = 0,
+            Width = 780,
+            Height = 154,
+            StartColor = Color.FromArgb(23, 35, 45),
+            EndColor = Color.FromArgb(9, 16, 22)
+        };
 
-		var headerDivider = new Panel
-		{
-			Dock = DockStyle.Bottom,
-			Height = 1,
-			BackColor = Color.FromArgb(220, 224, 230)
-		};
+        var logo = new PictureBox
+        {
+            Left = 34,
+            Top = 28,
+            Width = 280,
+            Height = 86,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = Color.Transparent,
+            Image = InstallerAssets.LoadHeroImage() ?? InstallerAssets.LoadLogoImage()
+        };
 
-		var headerLogo = new PictureBox
-		{
-			Left = 20,
-			Top = 18,
-			Width = 48,
-			Height = 48,
-			SizeMode = PictureBoxSizeMode.Zoom,
-			BackColor = Color.Transparent,
-			Image = InstallerAssets.LoadLogoImage() ?? InstallerAssets.LoadHeroImage()
-		};
+        var title = new Label
+        {
+            Left = 350,
+            Top = 36,
+            Width = 380,
+            Height = 36,
+            Text = "Установка Vesper Launcher",
+            Font = new Font("Segoe UI Semibold", 19f, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.Transparent
+        };
 
-		var headerTitle = new Label
-		{
-			Left = 82,
-			Top = 18,
-			AutoSize = true,
-			Text = "Vesper Launcher",
-			Font = new Font("Segoe UI Semibold", 18f, FontStyle.Bold),
-			ForeColor = Color.FromArgb(28, 32, 39)
-		};
+        var subtitle = new Label
+        {
+            Left = 352,
+            Top = 78,
+            Width = 360,
+            Height = 42,
+            Text = "Выбери диск и папку. Обновления останутся безопасными через Velopack.",
+            Font = new Font("Segoe UI", 10.5f, FontStyle.Regular),
+            ForeColor = Color.FromArgb(210, 224, 235),
+            BackColor = Color.Transparent
+        };
 
-		var headerSubtitle = new Label
-		{
-			Left = 84,
-			Top = 48,
-			AutoSize = true,
-			Text = "Установщик для Windows",
-			Font = new Font("Segoe UI", 10f, FontStyle.Regular),
-			ForeColor = Color.FromArgb(96, 104, 118)
-		};
+        heroPanel.Controls.Add(logo);
+        heroPanel.Controls.Add(title);
+        heroPanel.Controls.Add(subtitle);
 
-		headerPanel.Controls.Add(headerLogo);
-		headerPanel.Controls.Add(headerTitle);
-		headerPanel.Controls.Add(headerSubtitle);
-		headerPanel.Controls.Add(headerDivider);
+        var bodyPanel = new Panel
+        {
+            Left = 28,
+            Top = 180,
+            Width = 724,
+            Height = 218,
+            BackColor = Color.FromArgb(18, 27, 35)
+        };
 
-		var introLabel = new Label
-		{
-			Left = 20,
-			Top = 108,
-			Width = 708,
-			Height = 36,
-			Text = "Выбери папку установки и при необходимости настрой ярлыки. Всё остальное установщик сделает сам.",
-			ForeColor = Color.FromArgb(80, 86, 97)
-		};
+        var pathLabel = new Label
+        {
+            Left = 22,
+            Top = 22,
+            Width = 660,
+            Height = 22,
+            Text = "Папка установки",
+            Font = new Font("Segoe UI Semibold", 11f, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.Transparent
+        };
 
-		var installPathGroup = new GroupBox
-		{
-			Left = 20,
-			Top = 148,
-			Width = 708,
-			Height = 92,
-			Text = "Папка установки"
-		};
+        _pathTextBox.Left = 22;
+        _pathTextBox.Top = 56;
+        _pathTextBox.Width = 548;
+        _pathTextBox.Height = 30;
+        _pathTextBox.Text = InstallerPaths.ResolveInstallDirectory(_startupOptions.InstallDirectoryOverride);
+        _pathTextBox.BackColor = Color.FromArgb(26, 38, 48);
+        _pathTextBox.ForeColor = Color.White;
+        _pathTextBox.BorderStyle = BorderStyle.FixedSingle;
 
-		_pathTextBox.Left = 16;
-		_pathTextBox.Top = 36;
-		_pathTextBox.Width = 554;
-		_pathTextBox.Text = InstallerPaths.ResolveInstallDirectory(_startupOptions.InstallDirectoryOverride);
+        _browseButton.Left = 586;
+        _browseButton.Top = 54;
+        _browseButton.Width = 116;
+        _browseButton.Height = 34;
+        _browseButton.Text = "Обзор...";
+        _browseButton.FlatStyle = FlatStyle.Flat;
+        _browseButton.FlatAppearance.BorderColor = Color.FromArgb(86, 121, 146);
+        _browseButton.BackColor = Color.FromArgb(30, 48, 62);
+        _browseButton.ForeColor = Color.White;
+        _browseButton.Click += (_, _) => BrowseFolder();
 
-		_browseButton.Left = 580;
-		_browseButton.Top = 34;
-		_browseButton.Width = 110;
-		_browseButton.Height = 28;
-		_browseButton.Text = "Обзор...";
-		_browseButton.Click += delegate
-		{
-			BrowseFolder();
-		};
+        var hint = new Label
+        {
+            Left = 22,
+            Top = 102,
+            Width = 660,
+            Height = 42,
+            Text = "Можно выбрать D:, E: или любую другую папку. Внутри будет запущен официальный Velopack setup с этим путем.",
+            ForeColor = Color.FromArgb(196, 211, 222),
+            BackColor = Color.Transparent
+        };
 
-		installPathGroup.Controls.Add(_pathTextBox);
-		installPathGroup.Controls.Add(_browseButton);
+        _launchAfterInstallCheckBox.Left = 22;
+        _launchAfterInstallCheckBox.Top = 158;
+        _launchAfterInstallCheckBox.Width = 330;
+        _launchAfterInstallCheckBox.Height = 26;
+        _launchAfterInstallCheckBox.Text = "Запустить лаунчер после установки";
+        _launchAfterInstallCheckBox.Checked = _startupOptions.LaunchAfterInstall;
+        _launchAfterInstallCheckBox.ForeColor = Color.White;
+        _launchAfterInstallCheckBox.BackColor = Color.Transparent;
 
-		var optionsGroup = new GroupBox
-		{
-			Left = 20,
-			Top = 252,
-			Width = 708,
-			Height = 118,
-			Text = "Параметры"
-		};
+        bodyPanel.Controls.Add(pathLabel);
+        bodyPanel.Controls.Add(_pathTextBox);
+        bodyPanel.Controls.Add(_browseButton);
+        bodyPanel.Controls.Add(hint);
+        bodyPanel.Controls.Add(_launchAfterInstallCheckBox);
 
-		_desktopShortcutCheckBox.Left = 16;
-		_desktopShortcutCheckBox.Top = 28;
-		_desktopShortcutCheckBox.Width = 260;
-		_desktopShortcutCheckBox.Text = "Создать ярлык на рабочем столе";
-		_desktopShortcutCheckBox.Checked = _startupOptions.CreateDesktopShortcut;
+        _progressBar.Left = 28;
+        _progressBar.Top = 418;
+        _progressBar.Width = 724;
+        _progressBar.Height = 16;
+        _progressBar.Minimum = 0;
+        _progressBar.Maximum = 100;
+        _progressBar.Style = ProgressBarStyle.Continuous;
 
-		_startMenuShortcutCheckBox.Left = 16;
-		_startMenuShortcutCheckBox.Top = 54;
-		_startMenuShortcutCheckBox.Width = 260;
-		_startMenuShortcutCheckBox.Text = "Добавить в меню Пуск";
-		_startMenuShortcutCheckBox.Checked = true;
-		_startMenuShortcutCheckBox.Enabled = false;
+        _statusLabel.Left = 28;
+        _statusLabel.Top = 444;
+        _statusLabel.Width = 430;
+        _statusLabel.Height = 24;
+        _statusLabel.Text = "Готово к установке.";
+        _statusLabel.ForeColor = Color.FromArgb(196, 211, 222);
 
-		_launchAfterInstallCheckBox.Left = 16;
-		_launchAfterInstallCheckBox.Top = 80;
-		_launchAfterInstallCheckBox.Width = 320;
-		_launchAfterInstallCheckBox.Text = "Запустить лаунчер после установки";
-		_launchAfterInstallCheckBox.Checked = _startupOptions.LaunchAfterInstall;
+        _installButton.Left = 526;
+        _installButton.Top = 438;
+        _installButton.Width = 106;
+        _installButton.Height = 34;
+        _installButton.Text = "Установить";
+        _installButton.FlatStyle = FlatStyle.Flat;
+        _installButton.FlatAppearance.BorderColor = Color.FromArgb(112, 177, 213);
+        _installButton.BackColor = Color.FromArgb(42, 91, 119);
+        _installButton.ForeColor = Color.White;
+        _installButton.Click += async (_, _) => await InstallAsync();
 
-		optionsGroup.Controls.Add(_desktopShortcutCheckBox);
-		optionsGroup.Controls.Add(_startMenuShortcutCheckBox);
-		optionsGroup.Controls.Add(_launchAfterInstallCheckBox);
+        _cancelButton.Left = 646;
+        _cancelButton.Top = 438;
+        _cancelButton.Width = 106;
+        _cancelButton.Height = 34;
+        _cancelButton.Text = "Отмена";
+        _cancelButton.FlatStyle = FlatStyle.Flat;
+        _cancelButton.FlatAppearance.BorderColor = Color.FromArgb(78, 92, 102);
+        _cancelButton.BackColor = Color.FromArgb(25, 34, 42);
+        _cancelButton.ForeColor = Color.White;
+        _cancelButton.Click += (_, _) => Close();
 
-		_progressBar.Left = 20;
-		_progressBar.Top = 386;
-		_progressBar.Width = 708;
-		_progressBar.Height = 18;
-		_progressBar.Minimum = 0;
-		_progressBar.Maximum = 100;
-		_progressBar.Style = ProgressBarStyle.Continuous;
+        AcceptButton = _installButton;
+        CancelButton = _cancelButton;
 
-		_statusLabel.Left = 20;
-		_statusLabel.Top = 410;
-		_statusLabel.Width = 430;
-		_statusLabel.Height = 24;
-		_statusLabel.Text = "Готово к установке.";
-		_statusLabel.ForeColor = Color.FromArgb(80, 86, 97);
+        Controls.Add(heroPanel);
+        Controls.Add(bodyPanel);
+        Controls.Add(_progressBar);
+        Controls.Add(_statusLabel);
+        Controls.Add(_installButton);
+        Controls.Add(_cancelButton);
 
-		_installButton.Left = 502;
-		_installButton.Top = 404;
-		_installButton.Width = 106;
-		_installButton.Height = 30;
-		_installButton.Text = "Установить";
-		_installButton.Click += async delegate
-		{
-			await InstallAsync();
-		};
+        ResumeLayout(performLayout: false);
+    }
 
-		_cancelButton.Left = 622;
-		_cancelButton.Top = 404;
-		_cancelButton.Width = 106;
-		_cancelButton.Height = 30;
-		_cancelButton.Text = "Отмена";
-		_cancelButton.Click += delegate
-		{
-			Close();
-		};
+    private void BrowseFolder()
+    {
+        using var folderBrowserDialog = new FolderBrowserDialog
+        {
+            Description = "Выбери папку для установки Vesper Launcher",
+            UseDescriptionForTitle = true,
+            SelectedPath = _pathTextBox.Text
+        };
 
-		AcceptButton = _installButton;
-		CancelButton = _cancelButton;
+        if (folderBrowserDialog.ShowDialog(this) == DialogResult.OK)
+        {
+            _pathTextBox.Text = folderBrowserDialog.SelectedPath;
+        }
+    }
 
-		Controls.Add(headerPanel);
-		Controls.Add(introLabel);
-		Controls.Add(installPathGroup);
-		Controls.Add(optionsGroup);
-		Controls.Add(_progressBar);
-		Controls.Add(_statusLabel);
-		Controls.Add(_installButton);
-		Controls.Add(_cancelButton);
+    private async Task InstallAsync()
+    {
+        var installPath = _pathTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(installPath))
+        {
+            MessageBox.Show(this, "Укажи папку установки.", "Нет пути", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+            return;
+        }
 
-		UpdateInstallButtonState();
-		ResumeLayout(performLayout: false);
-	}
+        SetUiEnabled(false);
+        try
+        {
+            var options = _startupOptions with
+            {
+                InstallDirectoryOverride = installPath,
+                LaunchAfterInstall = _launchAfterInstallCheckBox.Checked
+            };
 
-	private void BrowseFolder()
-	{
-		FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog
-		{
-			Description = "Выбери папку для установки",
-			UseDescriptionForTitle = true,
-			SelectedPath = _pathTextBox.Text
-		};
+            var installResult = await Task.Run(() => InstallerOperations.Install(options, ReportProgress));
+            _statusLabel.Text = "Установка завершена.";
+            _progressBar.Value = 100;
 
-		try
-		{
-			if (folderBrowserDialog.ShowDialog(this) == DialogResult.OK)
-			{
-				_pathTextBox.Text = folderBrowserDialog.SelectedPath;
-			}
-		}
-		finally
-		{
-			((IDisposable)folderBrowserDialog).Dispose();
-		}
-	}
+            if (options.LaunchAfterInstall)
+            {
+                InstallerOperations.TryLaunch(installResult.ExecutablePath);
+            }
 
-	private async Task InstallAsync()
-	{
-		string installPath = _pathTextBox.Text.Trim();
-		if (string.IsNullOrWhiteSpace(installPath))
-		{
-			MessageBox.Show(this, "Укажи папку установки.", "Нет пути", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-			return;
-		}
+            MessageBox.Show(this, "Vesper Launcher установлен.", "Готово", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Close();
+        }
+        catch (Exception ex)
+        {
+            _statusLabel.Text = "Ошибка установки.";
+            MessageBox.Show(this, ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            SetUiEnabled(true);
+        }
+    }
 
-		SetUiEnabled(enabled: false);
-		try
-		{
-			InstallerOptions options = _startupOptions with
-			{
-				InstallDirectoryOverride = installPath,
-				CreateDesktopShortcut = _desktopShortcutCheckBox.Checked,
-				LaunchAfterInstall = _launchAfterInstallCheckBox.Checked
-			};
+    private void ReportProgress(InstallProgress progress)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
 
-			InstallResult installResult = await Task.Run(() => InstallerOperations.Install(options, ReportProgress));
-			_statusLabel.Text = "Установка завершена.";
-			_progressBar.Value = 100;
+        if (InvokeRequired)
+        {
+            Invoke(() => ReportProgress(progress));
+            return;
+        }
 
-			MessageBox.Show(this, "Лаунчер установлен.", "Готово", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
-			if (options.LaunchAfterInstall)
-			{
-				InstallerOperations.TryLaunch(installResult.ExecutablePath);
-			}
-		}
-		catch (Exception ex)
-		{
-			_statusLabel.Text = "Ошибка установки.";
-			MessageBox.Show(this, ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Hand);
-		}
-		finally
-		{
-			SetUiEnabled(enabled: true);
-		}
-	}
+        _statusLabel.Text = progress.Status;
+        _progressBar.Value = Math.Max(_progressBar.Minimum, Math.Min(_progressBar.Maximum, progress.Percent));
+    }
 
-	private void ReportProgress(InstallProgress progress)
-	{
-		if (IsDisposed)
-		{
-			return;
-		}
+    private void SetUiEnabled(bool enabled)
+    {
+        _pathTextBox.Enabled = enabled;
+        _browseButton.Enabled = enabled;
+        _cancelButton.Enabled = enabled;
+        _launchAfterInstallCheckBox.Enabled = enabled;
+        _installButton.Enabled = enabled;
+    }
 
-		if (InvokeRequired)
-		{
-			Invoke(delegate
-			{
-				ReportProgress(progress);
-			});
-			return;
-		}
+    private sealed class GradientPanel : Panel
+    {
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color StartColor { get; init; }
 
-		_statusLabel.Text = progress.Status;
-		_progressBar.Value = Math.Max(_progressBar.Minimum, Math.Min(_progressBar.Maximum, progress.Percent));
-	}
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color EndColor { get; init; }
 
-	private void SetUiEnabled(bool enabled)
-	{
-		_pathTextBox.Enabled = enabled;
-		_browseButton.Enabled = enabled;
-		_cancelButton.Enabled = enabled;
-		_desktopShortcutCheckBox.Enabled = enabled;
-		_launchAfterInstallCheckBox.Enabled = enabled;
-		UpdateInstallButtonState(enabled);
-	}
-
-	private void UpdateInstallButtonState(bool uiEnabled = true)
-	{
-		_installButton.Enabled = uiEnabled;
-	}
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            using var brush = new LinearGradientBrush(ClientRectangle, StartColor, EndColor, LinearGradientMode.Horizontal);
+            e.Graphics.FillRectangle(brush, ClientRectangle);
+            base.OnPaint(e);
+        }
+    }
 }
