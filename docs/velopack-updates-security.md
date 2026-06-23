@@ -70,6 +70,15 @@ After publishing, the public installer link should stay stable:
 https://github.com/wertyy111/Updates-Vesper/releases/latest/download/VesperLauncherSetup.exe
 ```
 
+By default, `Publish-VelopackUpdate.ps1` keeps only the newest published GitHub Release:
+
+- old releases are deleted;
+- old tags are deleted when GitHub allows it;
+- the internal Velopack setup asset is removed from the release;
+- the public setup asset stays named `VesperLauncherSetup.exe`.
+
+This prevents users from downloading old launcher builds from the updates repository. Velopack package metadata still contains the current package version internally.
+
 ## Client config
 
 The launcher reads `MinecraftCheatLauncher/update-config.json`.

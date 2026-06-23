@@ -11,12 +11,17 @@ param(
     [string]$MainExe = 'MinecraftCheatLauncher.exe',
     [string]$SetupFileName = 'VesperLauncherSetup.exe',
     [string]$RepoUrl = 'https://github.com/wertyy111/Updates-Vesper',
+    [string]$ReleaseName,
+    [string]$TagName,
     [string]$OutputRoot = '%LOCALAPPDATA%/VesperLauncherBuild/velopack',
     [string]$ReleaseNotesPath,
+    [bool]$KeepOnlyLatest = $true,
+    [bool]$PublishStableSetupAsset = $true,
     [switch]$SkipFrontendBuild,
     [switch]$SkipPreviousDownload,
     [switch]$UploadDraft,
-    [switch]$Publish
+    [switch]$Publish,
+    [switch]$PreRelease
 )
 
 Set-StrictMode -Version Latest
@@ -119,12 +124,168 @@ function Rename-SetupPackage {
         throw "Velopack setup package was not found in $ReleasesDirectory."
     }
 
-    if (Test-Path -LiteralPath $targetPath -PathType Leaf) {
-        Remove-Item -LiteralPath $targetPath -Force
+    Copy-Item -LiteralPath $source.FullName -Destination $targetPath -Force
+    Write-Host "Stable setup package: $targetPath"
+}
+
+function Get-GitHubRepoPath {
+    param([Parameter(Mandatory = $true)][string]$RepoUrl)
+
+    $trimmed = $RepoUrl.Trim().TrimEnd('/')
+    if ($trimmed -match 'github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$') {
+        return "$($Matches[1])/$($Matches[2])"
     }
 
-    Move-Item -LiteralPath $source.FullName -Destination $targetPath -Force
-    Write-Host "Stable setup package: $targetPath"
+    throw "RepoUrl must point to a GitHub repository: $RepoUrl"
+}
+
+function Invoke-GitHubApi {
+    param(
+        [Parameter(Mandatory = $true)][string]$Method,
+        [Parameter(Mandatory = $true)][string]$Uri,
+        $Body = $null
+    )
+
+    $headers = @{
+        Authorization          = "Bearer $env:VPK_TOKEN"
+        Accept                 = 'application/vnd.github+json'
+        'X-GitHub-Api-Version' = '2022-11-28'
+        'User-Agent'           = 'VesperLauncherVelopackPublisher'
+    }
+
+    if ($null -eq $Body) {
+        return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $headers
+    }
+
+    return Invoke-RestMethod `
+        -Method $Method `
+        -Uri $Uri `
+        -Headers $headers `
+        -ContentType 'application/json' `
+        -Body ($Body | ConvertTo-Json -Depth 10 -Compress)
+}
+
+function Try-InvokeGitHubApi {
+    param(
+        [Parameter(Mandatory = $true)][string]$Method,
+        [Parameter(Mandatory = $true)][string]$Uri
+    )
+
+    try {
+        return Invoke-GitHubApi -Method $Method -Uri $Uri
+    }
+    catch {
+        if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 404) {
+            return $null
+        }
+
+        throw
+    }
+}
+
+function Upload-GitHubReleaseAsset {
+    param(
+        [Parameter(Mandatory = $true)]$Release,
+        [Parameter(Mandatory = $true)][string]$AssetPath
+    )
+
+    $assetName = Split-Path -Leaf $AssetPath
+    foreach ($asset in @($Release.assets)) {
+        if ($asset.name -eq $assetName) {
+            Invoke-GitHubApi -Method 'DELETE' -Uri $asset.url | Out-Null
+        }
+    }
+
+    $uploadUrl = ($Release.upload_url -replace '\{\?name,label\}$', '') + "?name=$([Uri]::EscapeDataString($assetName))"
+    $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+    if ($null -ne $curl) {
+        & $curl.Source `
+            '--http1.1' `
+            '--silent' `
+            '--show-error' `
+            '--fail' `
+            '--location' `
+            '--retry' '5' `
+            '--retry-all-errors' `
+            '-X' 'POST' `
+            '-H' "Authorization: Bearer $env:VPK_TOKEN" `
+            '-H' 'Accept: application/vnd.github+json' `
+            '-H' 'X-GitHub-Api-Version: 2022-11-28' `
+            '-H' 'User-Agent: VesperLauncherVelopackPublisher' `
+            '-H' 'Content-Type: application/octet-stream' `
+            '--data-binary' "@$AssetPath" `
+            $uploadUrl | Out-Null
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "curl.exe failed to upload release asset '$assetName' with exit code $LASTEXITCODE."
+        }
+
+        return
+    }
+
+    Invoke-WebRequest `
+        -Method 'POST' `
+        -Uri $uploadUrl `
+        -Headers @{
+            Authorization = "Bearer $env:VPK_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+            'User-Agent' = 'VesperLauncherVelopackPublisher'
+        } `
+        -ContentType 'application/octet-stream' `
+        -InFile $AssetPath | Out-Null
+}
+
+function Publish-StableSetupAsset {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoPath,
+        [Parameter(Mandatory = $true)][string]$TagName,
+        [Parameter(Mandatory = $true)][string]$StableSetupPath,
+        [Parameter(Mandatory = $true)][string]$OriginalSetupName
+    )
+
+    $encodedTag = [Uri]::EscapeDataString($TagName)
+    $release = Try-InvokeGitHubApi -Method 'GET' -Uri "https://api.github.com/repos/$RepoPath/releases/tags/$encodedTag"
+    if ($null -eq $release) {
+        throw "GitHub release was not found after upload: $TagName"
+    }
+
+    Upload-GitHubReleaseAsset -Release $release -AssetPath $StableSetupPath
+
+    $release = Invoke-GitHubApi -Method 'GET' -Uri "https://api.github.com/repos/$RepoPath/releases/tags/$encodedTag"
+    foreach ($asset in @($release.assets)) {
+        if ($asset.name -eq $OriginalSetupName) {
+            Invoke-GitHubApi -Method 'DELETE' -Uri $asset.url | Out-Null
+            Write-Host "Removed internal setup asset from GitHub release: $OriginalSetupName"
+        }
+    }
+}
+
+function Remove-OldGitHubReleases {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoPath,
+        [Parameter(Mandatory = $true)][string]$CurrentTagName
+    )
+
+    $releases = Invoke-GitHubApi -Method 'GET' -Uri "https://api.github.com/repos/$RepoPath/releases?per_page=100"
+    foreach ($release in @($releases)) {
+        if ($release.tag_name -eq $CurrentTagName) {
+            continue
+        }
+
+        Write-Host "Deleting old GitHub release: $($release.tag_name)"
+        Invoke-GitHubApi -Method 'DELETE' -Uri "https://api.github.com/repos/$RepoPath/releases/$($release.id)" | Out-Null
+
+        $encodedTag = [Uri]::EscapeDataString($release.tag_name)
+        try {
+            Invoke-GitHubApi -Method 'DELETE' -Uri "https://api.github.com/repos/$RepoPath/git/refs/tags/$encodedTag" | Out-Null
+        }
+        catch {
+            if (-not $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 404) {
+                throw
+            }
+        }
+    }
 }
 
 $repoRoot = Resolve-NormalizedPath (Join-Path $PSScriptRoot '..')
@@ -234,17 +395,53 @@ if ($Publish -or $UploadDraft) {
     Ensure-VpkTokenForUpload
 
     $publishValue = if ($Publish) { 'true' } else { 'false' }
-    $releaseName = "Vesper Launcher $safeVersion"
+    $effectiveTagName = if ([string]::IsNullOrWhiteSpace($TagName)) {
+        "v$safeVersion"
+    }
+    else {
+        $TagName.Trim()
+    }
+    $releaseNameValue = if ([string]::IsNullOrWhiteSpace($ReleaseName)) {
+        "Vesper Launcher $safeVersion"
+    }
+    else {
+        $ReleaseName.Trim()
+    }
+
     Write-Host "Uploading Velopack release to $RepoUrl (publish=$publishValue)..."
-    Invoke-RepoDotnet -RepoRoot $repoRoot -Arguments @(
+    $uploadArguments = @(
         'tool', 'run', 'vpk', '--',
         'upload', 'github',
         '--outputDir', $releasesDirectory,
         '--channel', $Channel,
         '--repoUrl', $RepoUrl,
         '--publish', $publishValue,
-        '--releaseName', $releaseName
+        '--releaseName', $releaseNameValue
     )
+
+    $uploadArguments += @('--tag', $effectiveTagName)
+
+    if ($PreRelease) {
+        $uploadArguments += @('--pre', 'true')
+    }
+
+    Invoke-RepoDotnet -RepoRoot $repoRoot -Arguments $uploadArguments
+
+    $repoPath = Get-GitHubRepoPath -RepoUrl $RepoUrl
+    $stableSetupPath = Join-Path $releasesDirectory $SetupFileName
+    $internalSetupName = "$PackId-$Channel-Setup.exe"
+
+    if ($PublishStableSetupAsset -and (Test-Path -LiteralPath $stableSetupPath -PathType Leaf)) {
+        Publish-StableSetupAsset `
+            -RepoPath $repoPath `
+            -TagName $effectiveTagName `
+            -StableSetupPath $stableSetupPath `
+            -OriginalSetupName $internalSetupName
+    }
+
+    if ($Publish -and $KeepOnlyLatest) {
+        Remove-OldGitHubReleases -RepoPath $repoPath -CurrentTagName $effectiveTagName
+    }
 }
 else {
     Write-Host ''
