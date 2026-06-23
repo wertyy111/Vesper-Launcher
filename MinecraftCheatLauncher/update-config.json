@@ -1,10 +1,11 @@
 {
   "Enabled": true,
   "CheckOnStartup": true,
-  "AppCastUrl": "https://wertyy111.github.io/Updates-Vesper/appcast.xml",
-  "PublicEd25519Key": "/2515+I46mnfNG0yBDYyGQOwSF/Kv0DFXR7bJ5D/CWc=",
-  "CustomInstallerArguments": "/SILENT /NORESTART /SP- /CLOSEAPPLICATIONS",
-  "RelaunchAfterUpdate": true,
+  "InstallOnStartup": true,
+  "SourceType": "GitHub",
+  "SourceUrl": "https://github.com/wertyy111/Updates-Vesper",
+  "Channel": "win",
+  "IncludePrerelease": false,
   "StartupDecisionTimeoutSeconds": 15,
-  "TempDownloadDirectory": ".launcher-updates"
+  "MaximumDeltasBeforeFallback": 3
 }

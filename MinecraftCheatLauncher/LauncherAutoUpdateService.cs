@@ -1,20 +1,16 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
-using NetSparkleUpdater;
-using NetSparkleUpdater.Enums;
-using NetSparkleUpdater.Events;
-using NetSparkleUpdater.SignatureVerifiers;
+using Velopack;
+using Velopack.Sources;
 
 namespace MinecraftCheatLauncher;
 
 internal sealed class LauncherAutoUpdateService
 {
-    private const long MinimumPreferredDownloadFreeSpaceBytes = 512L * 1024 * 1024;
+    private const long MinimumPreferredFreeSpaceBytes = 512L * 1024 * 1024;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -25,7 +21,6 @@ internal sealed class LauncherAutoUpdateService
 
     private readonly Action<Exception, string> _logError;
     private readonly Action<string> _logInfo;
-    private SparkleUpdater? _updater;
     private int _fallbackLaunchRequested;
 
     public LauncherAutoUpdateService(Action<Exception, string> logError, Action<string> logInfo)
@@ -39,441 +34,156 @@ internal sealed class LauncherAutoUpdateService
 
     public async Task<bool> RunBeforeLaunchAsync()
     {
+        var config = LoadConfig();
+        if (config is null || !config.Enabled || !config.CheckOnStartup)
+        {
+            ReportReady("Обновления выключены. Запускаем лаунчер.");
+            return true;
+        }
+
         try
         {
-            ReportStatus("Проверяем обновления...", "Подключаемся к серверу обновлений...");
+            ReportStatus("Проверяем обновления...", "Подключаемся к источнику Velopack...");
 
-            var config = LoadConfig();
-            if (config is null || !config.Enabled || !config.CheckOnStartup)
+            using var timeout = new CancellationTokenSource(BuildTimeout(config));
+            var manager = CreateUpdateManager(config);
+
+            if (!manager.IsInstalled)
             {
-                ReportStatus("Запускаем лаунчер...", "Автообновление отключено.", 100, false, "Готово");
+                _logInfo("Velopack update skipped: app is not installed by Velopack.");
+                ReportReady("Лаунчер запущен не из установленной Velopack-сборки.");
                 return true;
             }
 
-            if (!Uri.TryCreate(config.AppCastUrl, UriKind.Absolute, out var appCastUri) ||
-                !string.Equals(appCastUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            if (manager.UpdatePendingRestart is { } pendingUpdate)
             {
-                ReportStatus("Запускаем лаунчер...", "Ссылка на обновления настроена неверно.", 100, false, "Готово");
-                _logInfo("Автообновление отключено: укажи HTTPS URL в update-config.json.");
+                return ApplyPreparedUpdate(manager, pendingUpdate, config);
+            }
+
+            var updateInfo = await manager.CheckForUpdatesAsync().WaitAsync(timeout.Token).ConfigureAwait(false);
+            if (updateInfo is null)
+            {
+                ReportReady("Обновлений нет. Запускаем текущую версию.");
                 return true;
             }
 
-            if (string.IsNullOrWhiteSpace(config.PublicEd25519Key))
+            var targetVersion = updateInfo.TargetFullRelease.Version.ToString();
+            _logInfo($"Velopack update found: {targetVersion}.");
+
+            if (!config.InstallOnStartup)
             {
-                ReportStatus("Запускаем лаунчер...", "Публичный ключ обновлений не задан.", 100, false, "Готово");
-                _logInfo("Автообновление отключено: не задан PublicEd25519Key в update-config.json.");
+                ReportReady($"Доступна версия {targetVersion}. Автоустановка выключена.");
                 return true;
             }
 
-            var signatureVerifier = new Ed25519Checker(
-                SecurityMode.Strict,
-                config.PublicEd25519Key,
-                string.Empty,
-                readFileBeingVerifiedInChunks: true,
-                chunkSize: 5 * 1024 * 1024);
-
-            if (!signatureVerifier.HasValidKeyInformation())
+            if (!HasEnoughFreeSpace(AppContext.BaseDirectory, MinimumPreferredFreeSpaceBytes, out var freeBytes))
             {
-                ReportStatus("Запускаем лаунчер...", "Ключ подписи обновлений некорректен.", 100, false, "Готово");
-                _logInfo("Автообновление отключено: публичный ключ NetSparkle некорректен.");
+                ReportReady("Недостаточно места для обновления. Запускаем текущую версию.");
+                _logInfo($"Velopack update skipped: only {FormatBytes(freeBytes)} free.");
                 return true;
             }
 
-            _updater = new SparkleUpdater(config.AppCastUrl, signatureVerifier)
-            {
-                UserInteractionMode = UserInteractionMode.DownloadAndInstall,
-                // We let our own installer relaunch the launcher after install.
-                // NetSparkle relaunching the pre-update executable path can reopen an old copy and create an update loop.
-                RelaunchAfterUpdate = false,
-                CustomInstallerArguments = BuildInstallerArguments(config.CustomInstallerArguments),
-                CheckServerFileName = false
-            };
+            ReportStatus(
+                $"Найдена версия {targetVersion}.",
+                "Скачиваем безопасный пакет обновления...",
+                0,
+                false,
+                "0%");
 
-            var downloadDirectory = ResolvePreferredDownloadDirectory(config.TempDownloadDirectory);
-            Directory.CreateDirectory(downloadDirectory);
-            _updater.TmpDownloadFilePath = downloadDirectory;
-            _logInfo($"Папка временной загрузки обновлений: {downloadDirectory}");
+            await manager.DownloadUpdatesAsync(
+                updateInfo,
+                progress => ReportStatus(
+                    "Скачиваем обновление...",
+                    $"{Math.Clamp(progress, 0, 100)}%",
+                    progress,
+                    false,
+                    $"{Math.Clamp(progress, 0, 100)}%"),
+                timeout.Token).ConfigureAwait(false);
 
-            var launchDecision = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            _updater.UpdateCheckStarted += _ =>
-            {
-                _logInfo("Update check started.");
-                ReportStatus("Проверяем обновления...", "Подключаемся к серверу обновлений...");
-            };
-
-            _updater.UpdateCheckFinished += (_, status) =>
-            {
-                _logInfo($"Update check finished with status: {status}.");
-
-                if (status == UpdateStatus.UpdateAvailable)
-                {
-                    var availableUpdates = _updater.LatestAppCastItems;
-                    var updateItem = availableUpdates is not null && availableUpdates.Count > 0
-                        ? availableUpdates[0]
-                        : null;
-
-                    if (updateItem is null)
-                    {
-                        ContinueWithCurrentVersion(
-                            launchDecision,
-                            "Список обновлений пришел пустым. Запускаем текущую версию...",
-                            "NetSparkle сообщил о доступном обновлении, но не вернул пакет для скачивания.");
-                        return;
-                    }
-
-                    ReportStatus("Найдена новая версия.", "Начинаем скачивание обновления...", 0, true, "Подготовка...");
-                    _logInfo($"Найдено обновление до запуска окна. Версия: {updateItem.Version}. AppCast: {appCastUri}");
-                    launchDecision.TrySetResult(false);
-                    _ = BeginSilentDownloadAndInstallAsync(updateItem, launchDecision);
-                    return;
-                }
-
-                ReportStatus("Обновлений не найдено.", "Запускаем текущую версию лаунчера...", 100, false, "Готово");
-                launchDecision.TrySetResult(true);
-            };
-
-            _updater.DownloadStarted += (_, path) =>
-            {
-                _logInfo($"Update download started. Path: {path}");
-                ReportStatus("Скачиваем обновление...", "Подготавливаем файл обновления...", 0, true, "Подготовка...");
-            };
-
-            _updater.DownloadMadeProgress += (_, _, args) =>
-            {
-                ReportDownloadProgress(args);
-            };
-
-            _updater.DownloadFinished += (_, path) =>
-            {
-                _logInfo($"Update download finished. Path: {path}");
-                ReportStatus("Загрузка завершена.", "Проверяем пакет обновления...", 100, false, "100%");
-            };
-
-            _updater.DownloadHadError += (_, _, _) => ContinueWithCurrentVersion(
-                launchDecision,
-                "Не удалось скачать обновление. Запускаем текущую версию...",
-                "Обновление не скачалось. Запускаем текущую версию.");
-
-            _updater.DownloadCanceled += (_, _) => ContinueWithCurrentVersion(
-                launchDecision,
-                "Скачивание обновления отменено. Запускаем текущую версию...",
-                "Скачивание обновления было отменено. Запускаем текущую версию.");
-
-            _updater.DownloadedFileIsCorrupt += (_, _) => ContinueWithCurrentVersion(
-                launchDecision,
-                "Файл обновления поврежден. Запускаем текущую версию...",
-                "Файл обновления поврежден. Запускаем текущую версию.");
-
-            _updater.DownloadedFileThrewWhileCheckingSignature += (_, _) => ContinueWithCurrentVersion(
-                launchDecision,
-                "Подпись обновления не прошла проверку. Запускаем текущую версию...",
-                "Подпись обновления не прошла проверку. Запускаем текущую версию.");
-
-            _updater.InstallUpdateFailed += (failureReason, _) =>
-            {
-                ContinueWithCurrentVersion(
-                    launchDecision,
-                    "Не удалось установить обновление. Запускаем текущую версию...",
-                    $"Установка обновления не удалась: {failureReason}. Запускаем текущую версию.");
-                return true;
-            };
-
-            _updater.PreparingToExit += (_, _) =>
-            {
-                _logInfo("Updater is preparing launcher shutdown before install.");
-                ReportStatus("Закрываем лаунчер для обновления...", "Не закрывайте окно. Установка уже запускается.", 100, false, "Установка...");
-            };
-
-            _updater.CloseApplication += () =>
-            {
-                _logInfo("NetSparkle requested application shutdown.");
-                ReportStatus("Завершаем лаунчер...", "Сейчас откроется установщик обновления.", 100, false, "Закрытие...");
-
-                if (Application.Current is null)
-                {
-                    return;
-                }
-
-                void ShutdownApplication()
-                {
-                    try
-                    {
-                        Application.Current.Shutdown();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logError(ex, "Ошибка при закрытии лаунчера для обновления");
-                    }
-                }
-
-                if (Application.Current.Dispatcher.CheckAccess())
-                {
-                    ShutdownApplication();
-                }
-                else
-                {
-                    Application.Current.Dispatcher.BeginInvoke(new Action(ShutdownApplication));
-                }
-            };
-
-            _updater.InstallerProcessAboutToStart += (process, downloadFilePath) =>
-            {
-                TryPrepareInstallerProcess(process, downloadFilePath);
-                _logInfo("Installer process is about to start.");
-                _logInfo($"Installer start info: FileName={process.StartInfo.FileName}; Arguments={process.StartInfo.Arguments}; Download={downloadFilePath}");
-                ReportStatus("Запускаем установку...", "Обновление скачано. Сейчас начнется установка.", 100, false, "Установка...");
-                return true;
-            };
-
-            ReportStatus("Ищем новую версию...", "Получаем данные с сервера обновлений...");
-            _ = _updater.CheckForUpdatesQuietly(ignoreSkippedVersions: false);
-            _logInfo($"Автообновление включено. Проверяем {appCastUri} до запуска окна.");
-
-            var startupTimeout = TimeSpan.FromSeconds(config.StartupDecisionTimeoutSeconds <= 0
-                ? 15
-                : config.StartupDecisionTimeoutSeconds);
-
-            var completedTask = await Task.WhenAny(launchDecision.Task, Task.Delay(startupTimeout)).ConfigureAwait(false);
-            if (completedTask != launchDecision.Task)
-            {
-                ReportStatus("Сервер обновлений не ответил.", "Запускаем текущую версию лаунчера...", 100, false, "Готово");
-                _logInfo($"Проверка обновления на старте не уложилась в {startupTimeout.TotalSeconds:0} сек. Запускаем текущую версию.");
-                return true;
-            }
-
-            return await launchDecision.Task.ConfigureAwait(false);
+            return ApplyPreparedUpdate(manager, updateInfo.TargetFullRelease, config);
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logError(ex, "Проверка Velopack обновлений превысила лимит времени");
+            ContinueWithCurrentVersion("Сервер обновлений не ответил. Запускаем лаунчер.");
+            return true;
         }
         catch (Exception ex)
         {
-            ReportStatus("Запускаем лаунчер...", "Автообновление временно недоступно.", 100, false, "Готово");
-            _logError(ex, "Ошибка инициализации автообновления");
+            _logError(ex, "Ошибка Velopack обновления");
+            ContinueWithCurrentVersion("Обновление временно недоступно. Запускаем лаунчер.");
             return true;
         }
     }
 
-    private void ContinueWithCurrentVersion(
-        TaskCompletionSource<bool> launchDecision,
-        string statusMessage,
-        string logMessage)
+    private bool ApplyPreparedUpdate(UpdateManager manager, VelopackAsset update, LauncherUpdateConfig config)
     {
-        ReportStatus(statusMessage, "Открываем установленную версию лаунчера...", 100, false, "Готово");
-        _logInfo(logMessage);
-        launchDecision.TrySetResult(true);
+        if (!config.InstallOnStartup)
+        {
+            ReportReady($"Обновление {update.Version} готово, автоустановка выключена.");
+            return true;
+        }
 
+        ReportStatus(
+            "Применяем обновление...",
+            "Лаунчер перезапустится после установки пакета.",
+            100,
+            false,
+            "Установка...");
+        _logInfo($"Applying Velopack update {update.Version}.");
+        manager.ApplyUpdatesAndRestart(update);
+        return false;
+    }
+
+    private void ContinueWithCurrentVersion(string message)
+    {
+        ReportReady(message);
         if (Interlocked.Exchange(ref _fallbackLaunchRequested, 1) == 0)
         {
             FallbackLaunchRequested?.Invoke();
         }
     }
 
-    private string BuildInstallerArguments(string? configuredArguments)
+    private static UpdateManager CreateUpdateManager(LauncherUpdateConfig config)
     {
-        var baseArguments = string.IsNullOrWhiteSpace(configuredArguments)
-            ? "/SILENT /NORESTART /SP- /CLOSEAPPLICATIONS"
-            : configuredArguments.Trim();
-
-        var installDirectory = Path.GetFullPath(AppContext.BaseDirectory)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-
-        if (baseArguments.IndexOf("/DIR", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            baseArguments.IndexOf("--dir", StringComparison.OrdinalIgnoreCase) >= 0)
+        var options = new UpdateOptions
         {
-            return AppendDesktopShortcutPreference(baseArguments);
+            ExplicitChannel = string.IsNullOrWhiteSpace(config.Channel) ? null : config.Channel.Trim(),
+            AllowVersionDowngrade = false,
+            MaximumDeltasBeforeFallback = Math.Max(0, config.MaximumDeltasBeforeFallback)
+        };
+
+        var sourceUrl = config.SourceUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(sourceUrl))
+        {
+            throw new InvalidOperationException("Velopack SourceUrl is empty in update-config.json.");
         }
 
-        return AppendDesktopShortcutPreference($"{baseArguments} /DIR=\"{installDirectory}\"");
-    }
-
-    private static string AppendDesktopShortcutPreference(string arguments)
-    {
-        if (arguments.IndexOf("--no-desktop-shortcut", StringComparison.OrdinalIgnoreCase) >= 0)
+        if (config.SourceType.Equals("github", StringComparison.OrdinalIgnoreCase))
         {
-            return arguments;
-        }
-
-        var desktopShortcutPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
-            "Vesper Launcher.lnk");
-        return File.Exists(desktopShortcutPath)
-            ? arguments
-            : $"{arguments} --no-desktop-shortcut";
-    }
-
-    private async Task BeginSilentDownloadAndInstallAsync(
-        AppCastItem updateItem,
-        TaskCompletionSource<bool> launchDecision)
-    {
-        if (_updater is null)
-        {
-            ContinueWithCurrentVersion(
-                launchDecision,
-                "Сервис обновления недоступен. Запускаем текущую версию...",
-                "Попытка начать загрузку обновления была отменена: SparkleUpdater не инициализирован.");
-            return;
-        }
-
-        try
-        {
-            var fileNameWithExtension = BuildDownloadFileName(updateItem);
-            _updater.TmpDownloadFileNameWithExtension = fileNameWithExtension;
-            _logInfo($"Starting silent download for version {updateItem.Version}.");
-            _logInfo($"Temporary download file name: {fileNameWithExtension}");
-            _logInfo($"Installer arguments: {_updater.CustomInstallerArguments}");
-            await _updater.InitAndBeginDownload(updateItem).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logError(ex, "Ошибка при запуске тихого скачивания обновления");
-            ContinueWithCurrentVersion(
-                launchDecision,
-                "Не удалось запустить скачивание обновления. Запускаем текущую версию...",
-                "Не удалось запустить InitAndBeginDownload. Запускаем текущую версию.");
-        }
-    }
-
-    private void TryPrepareInstallerProcess(Process process, string? downloadFilePath)
-    {
-        try
-        {
-            var launchablePath = EnsureLaunchableInstallerPath(process.StartInfo.FileName, downloadFilePath);
-            if (string.IsNullOrWhiteSpace(launchablePath) ||
-                string.Equals(launchablePath, process.StartInfo.FileName, StringComparison.OrdinalIgnoreCase))
+            if (!Uri.TryCreate(sourceUrl, UriKind.Absolute, out var githubUri) ||
+                !string.Equals(githubUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                throw new InvalidOperationException("GitHub update source must be an HTTPS repository URL.");
             }
 
-            process.StartInfo.FileName = launchablePath;
-            var workingDirectory = Path.GetDirectoryName(launchablePath);
-            if (!string.IsNullOrWhiteSpace(workingDirectory))
-            {
-                process.StartInfo.WorkingDirectory = workingDirectory;
-            }
+            return new UpdateManager(new GithubSource(sourceUrl, accessToken: string.Empty, prerelease: config.IncludePrerelease), options);
+        }
 
-            _logInfo($"Prepared launchable installer copy: {launchablePath}");
-        }
-        catch (Exception ex)
+        if (Uri.TryCreate(sourceUrl, UriKind.Absolute, out var uri) &&
+            !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(uri.Scheme, Uri.UriSchemeFile, StringComparison.OrdinalIgnoreCase))
         {
-            _logError(ex, "РћС€РёР±РєР° РїСЂРё РїРѕРґРіРѕС‚РѕРІРєРµ С„Р°Р№Р»Р° СѓСЃС‚Р°РЅРѕРІС‰РёРєР° Рє Р·Р°РїСѓСЃРєСѓ");
+            throw new InvalidOperationException("Velopack update SourceUrl must use HTTPS or a local file path.");
         }
+
+        return new UpdateManager(sourceUrl, options);
     }
 
-    private static string? EnsureLaunchableInstallerPath(string? processFileName, string? downloadFilePath)
+    private void ReportReady(string detail)
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return processFileName;
-        }
-
-        var candidatePath = ChooseExistingPath(processFileName, downloadFilePath);
-        if (string.IsNullOrWhiteSpace(candidatePath) || !File.Exists(candidatePath))
-        {
-            return processFileName;
-        }
-
-        if (!string.IsNullOrWhiteSpace(Path.GetExtension(candidatePath)))
-        {
-            return candidatePath;
-        }
-
-        var launchablePath = candidatePath + ".exe";
-        File.Copy(candidatePath, launchablePath, overwrite: true);
-        return launchablePath;
-    }
-
-    private static string? ChooseExistingPath(string? primaryPath, string? secondaryPath)
-    {
-        if (!string.IsNullOrWhiteSpace(primaryPath) && File.Exists(primaryPath))
-        {
-            return primaryPath;
-        }
-
-        if (!string.IsNullOrWhiteSpace(secondaryPath) && File.Exists(secondaryPath))
-        {
-            return secondaryPath;
-        }
-
-        return primaryPath ?? secondaryPath;
-    }
-
-    private static string BuildDownloadFileName(AppCastItem updateItem)
-    {
-        var sourceName = TryGetFileNameFromDownloadLink(updateItem.DownloadLink);
-        var extension = Path.GetExtension(sourceName);
-        if (string.IsNullOrWhiteSpace(extension))
-        {
-            extension = ".exe";
-        }
-
-        var baseName = Path.GetFileNameWithoutExtension(sourceName);
-        if (string.IsNullOrWhiteSpace(baseName))
-        {
-            baseName = $"VesperLauncherUpdate-{NormalizeVersionForFileName(updateItem.Version?.ToString())}";
-        }
-
-        return $"{SanitizeFileName(baseName)}{extension}";
-    }
-
-    private static string TryGetFileNameFromDownloadLink(string? downloadLink)
-    {
-        if (string.IsNullOrWhiteSpace(downloadLink))
-        {
-            return string.Empty;
-        }
-
-        if (Uri.TryCreate(downloadLink, UriKind.Absolute, out var absoluteUri))
-        {
-            return Path.GetFileName(absoluteUri.LocalPath);
-        }
-
-        if (Uri.TryCreate(downloadLink, UriKind.Relative, out var relativeUri))
-        {
-            return Path.GetFileName(relativeUri.OriginalString);
-        }
-
-        return Path.GetFileName(downloadLink);
-    }
-
-    private static string NormalizeVersionForFileName(string? version)
-    {
-        return string.IsNullOrWhiteSpace(version)
-            ? "latest"
-            : SanitizeFileName(version);
-    }
-
-    private static string SanitizeFileName(string? name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return "update";
-        }
-
-        var invalidCharacters = Path.GetInvalidFileNameChars();
-        var buffer = name.Trim().ToCharArray();
-        for (var i = 0; i < buffer.Length; i++)
-        {
-            if (Array.IndexOf(invalidCharacters, buffer[i]) >= 0)
-            {
-                buffer[i] = '-';
-            }
-        }
-
-        var sanitized = new string(buffer).Trim().Trim('.');
-        return string.IsNullOrWhiteSpace(sanitized) ? "update" : sanitized;
-    }
-
-    private void ReportDownloadProgress(ItemDownloadProgressEventArgs args)
-    {
-        var detailMessage = args.TotalBytesToReceive > 0
-            ? $"{FormatBytes(args.BytesReceived)} / {FormatBytes(args.TotalBytesToReceive)}"
-            : $"Скачано {FormatBytes(args.BytesReceived)}";
-
-        ReportStatus(
-            "Скачиваем обновление...",
-            detailMessage,
-            args.ProgressPercentage,
-            false,
-            $"{Math.Clamp(args.ProgressPercentage, 0, 100)}%");
+        ReportStatus("Запускаем лаунчер...", detail, 100, false, "Готово");
+        _logInfo(detail);
     }
 
     private void ReportStatus(
@@ -493,26 +203,12 @@ internal sealed class LauncherAutoUpdateService
         });
     }
 
-    private static string FormatBytes(long bytes)
+    private static TimeSpan BuildTimeout(LauncherUpdateConfig config)
     {
-        if (bytes <= 0)
-        {
-            return "0 Б";
-        }
-
-        string[] units = ["Б", "КБ", "МБ", "ГБ"];
-        double value = bytes;
-        var unitIndex = 0;
-
-        while (value >= 1024 && unitIndex < units.Length - 1)
-        {
-            value /= 1024;
-            unitIndex++;
-        }
-
-        return unitIndex == 0
-            ? $"{value:0} {units[unitIndex]}"
-            : $"{value:0.0} {units[unitIndex]}";
+        var seconds = config.StartupDecisionTimeoutSeconds <= 0
+            ? 15
+            : config.StartupDecisionTimeoutSeconds;
+        return TimeSpan.FromSeconds(seconds);
     }
 
     private static LauncherUpdateConfig? LoadConfig()
@@ -537,36 +233,6 @@ internal sealed class LauncherAutoUpdateService
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "update-config.json"))
     ];
 
-    private static string ResolvePath(string path)
-    {
-        var expanded = Environment.ExpandEnvironmentVariables(path);
-        return Path.IsPathRooted(expanded)
-            ? expanded
-            : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, expanded));
-    }
-
-    private string ResolvePreferredDownloadDirectory(string? configuredPath)
-    {
-        var installDirectoryFallback = Path.Combine(AppContext.BaseDirectory, ".launcher-updates");
-        var configuredDirectory = string.IsNullOrWhiteSpace(configuredPath)
-            ? installDirectoryFallback
-            : ResolvePath(configuredPath);
-
-        if (!HasEnoughFreeSpace(configuredDirectory, MinimumPreferredDownloadFreeSpaceBytes, out var configuredFreeSpace))
-        {
-            if (!string.Equals(configuredDirectory, installDirectoryFallback, StringComparison.OrdinalIgnoreCase))
-            {
-                _logInfo(
-                    $"Недостаточно места для обновления в '{configuredDirectory}' " +
-                    $"({FormatBytes(configuredFreeSpace)} свободно). Переключаемся на '{installDirectoryFallback}'.");
-            }
-
-            return installDirectoryFallback;
-        }
-
-        return configuredDirectory;
-    }
-
     private static bool HasEnoughFreeSpace(string directoryPath, long minimumBytes, out long freeBytes)
     {
         freeBytes = 0;
@@ -586,20 +252,42 @@ internal sealed class LauncherAutoUpdateService
         }
         catch
         {
-            // If free space can't be determined, don't block the update path here.
             return true;
         }
     }
 
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes <= 0)
+        {
+            return "0 B";
+        }
+
+        string[] units = ["B", "KB", "MB", "GB"];
+        double value = bytes;
+        var unitIndex = 0;
+
+        while (value >= 1024 && unitIndex < units.Length - 1)
+        {
+            value /= 1024;
+            unitIndex++;
+        }
+
+        return unitIndex == 0
+            ? $"{value:0} {units[unitIndex]}"
+            : $"{value:0.0} {units[unitIndex]}";
+    }
+
     private sealed class LauncherUpdateConfig
     {
-        public bool Enabled { get; init; }
+        public bool Enabled { get; init; } = true;
         public bool CheckOnStartup { get; init; } = true;
-        public string? AppCastUrl { get; init; }
-        public string? PublicEd25519Key { get; init; }
-        public string? CustomInstallerArguments { get; init; }
-        public bool RelaunchAfterUpdate { get; init; } = true;
+        public bool InstallOnStartup { get; init; } = true;
+        public string SourceType { get; init; } = "GitHub";
+        public string? SourceUrl { get; init; }
+        public string Channel { get; init; } = "win";
+        public bool IncludePrerelease { get; init; }
         public int StartupDecisionTimeoutSeconds { get; init; } = 15;
-        public string TempDownloadDirectory { get; init; } = ".launcher-updates";
+        public int MaximumDeltasBeforeFallback { get; init; } = 3;
     }
 }

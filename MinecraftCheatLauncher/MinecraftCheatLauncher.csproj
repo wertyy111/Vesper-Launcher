@@ -34,9 +34,9 @@
 
   <ItemGroup>
     <PackageReference Include="BlurredBackground.WPF" Version="1.1.0" />
-    <PackageReference Include="NetSparkleUpdater.UI.WPF" Version="3.0.4" />
     <PackageReference Include="Open.NAT" Version="2.1.0" />
     <PackageReference Include="Photino.NET" Version="4.0.16" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
 
   <ItemGroup>

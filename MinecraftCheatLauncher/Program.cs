@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Photino.NET;
 using MinecraftCheatLauncher.Core;
 using MinecraftCheatLauncher.PhotinoHost;
+using Velopack;
 
 namespace MinecraftCheatLauncher;
 
@@ -38,6 +39,8 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        VelopackApp.Build().Run();
+
         AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
         {
             if (eventArgs.ExceptionObject is Exception exception)

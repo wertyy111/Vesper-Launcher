@@ -1,0 +1,75 @@
+# Velopack updates and source safety
+
+Vesper Launcher uses Velopack for launcher updates. The source repository stays private. The updates repository must contain only compiled Velopack artifacts.
+
+## What is safe
+
+- Keep source code in the private `Vesper-Launcher` repository.
+- Publish update artifacts to a separate binary-only repository such as `Updates-Vesper`.
+- Do not put GitHub tokens, private certificates, `.pfx` passwords, `.pdb` files, or source archives into release assets.
+- Use a fine-grained GitHub token scoped only to the updates repository.
+- Keep the token in the current PowerShell session as `VPK_TOKEN` or `GITHUB_TOKEN`.
+
+## What Velopack protects
+
+- It installs and updates the app through signed Velopack package metadata.
+- It downloads full and delta packages from the selected channel.
+- It refuses to update debug/uninstalled runs where `UpdateManager.IsInstalled` is false.
+
+Velopack does not make compiled .NET code impossible to reverse engineer. For stronger protection later, add code signing, trimming where safe, and obfuscation for release builds. Never rely on a secret embedded in the launcher binary.
+
+## Local package test
+
+This creates local packages only. Users will not receive an update.
+
+```powershell
+.\scripts\Publish-VelopackUpdate.ps1 -SkipPreviousDownload
+```
+
+Output goes to:
+
+```text
+%LOCALAPPDATA%\VesperLauncherBuild\velopack\<version>\Releases
+```
+
+## Draft upload
+
+This uploads a GitHub draft release, still not visible to normal users.
+
+```powershell
+$env:VPK_TOKEN = "YOUR_FINE_GRAINED_UPDATES_REPO_TOKEN"
+
+.\scripts\Publish-VelopackUpdate.ps1 `
+  -UploadDraft `
+  -RepoUrl "https://github.com/wertyy111/Updates-Vesper"
+```
+
+## Real update
+
+Run this only when you explicitly want installed users to update.
+
+```powershell
+$env:VPK_TOKEN = "YOUR_FINE_GRAINED_UPDATES_REPO_TOKEN"
+
+.\scripts\Publish-VelopackUpdate.ps1 `
+  -Publish `
+  -RepoUrl "https://github.com/wertyy111/Updates-Vesper"
+```
+
+## Client config
+
+The launcher reads `MinecraftCheatLauncher/update-config.json`.
+
+```json
+{
+  "Enabled": true,
+  "CheckOnStartup": true,
+  "InstallOnStartup": true,
+  "SourceType": "GitHub",
+  "SourceUrl": "https://github.com/wertyy111/Updates-Vesper",
+  "Channel": "win",
+  "IncludePrerelease": false
+}
+```
+
+`SourceUrl` must not require a client-side secret. If the updates repository is private, the launcher would need a token to read it, and that token could be extracted from the app. Use a public binary-only updates repository or a signed public object-storage feed instead.
