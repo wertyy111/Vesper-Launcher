@@ -18,6 +18,7 @@ param(
     [string]$ReleaseNotesPath,
     [bool]$KeepOnlyLatest = $true,
     [bool]$PublishStableSetupAsset = $true,
+    [bool]$ReplaceExistingRelease = $true,
     [switch]$SkipFrontendBuild,
     [switch]$SkipPreviousDownload,
     [switch]$UploadDraft,
@@ -289,6 +290,29 @@ function Remove-OldGitHubReleases {
     }
 }
 
+function Remove-GitHubReleaseByTag {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoPath,
+        [Parameter(Mandatory = $true)][string]$TagName
+    )
+
+    $encodedTag = [Uri]::EscapeDataString($TagName)
+    $release = Try-InvokeGitHubApi -Method 'GET' -Uri "https://api.github.com/repos/$RepoPath/releases/tags/$encodedTag"
+    if ($null -ne $release) {
+        Write-Host "Deleting existing GitHub release before replacement: $TagName"
+        Invoke-GitHubApi -Method 'DELETE' -Uri "https://api.github.com/repos/$RepoPath/releases/$($release.id)" | Out-Null
+    }
+
+    try {
+        Invoke-GitHubApi -Method 'DELETE' -Uri "https://api.github.com/repos/$RepoPath/git/refs/tags/$encodedTag" | Out-Null
+    }
+    catch {
+        if (-not $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 404) {
+            throw
+        }
+    }
+}
+
 function Rename-PublicPackageAsset {
     param(
         [Parameter(Mandatory = $true)][string]$RepoPath,
@@ -341,8 +365,8 @@ if (-not (Test-Path -LiteralPath $projectFullPath -PathType Leaf)) {
     throw "Project not found: $projectFullPath"
 }
 
-$userBuildRoot = Join-Path $env:LOCALAPPDATA 'VesperLauncherBuild'
-$env:DOTNET_CLI_HOME = Join-Path $repoRoot '.dotnet_home'
+$userBuildRoot = Join-Path $repoRoot '_build_verify/dotnet'
+$env:DOTNET_CLI_HOME = Join-Path $userBuildRoot 'dotnet_home'
 $env:NUGET_PACKAGES = Join-Path $userBuildRoot 'nuget'
 $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
 New-Item -ItemType Directory -Path $env:DOTNET_CLI_HOME, $env:NUGET_PACKAGES -Force | Out-Null
@@ -368,6 +392,7 @@ $releaseRoot = Join-Path $outputRootFullPath $safeVersion
 $publishDirectory = Join-Path $releaseRoot "publish-$RuntimeIdentifier"
 $releasesDirectory = Join-Path $releaseRoot 'Releases'
 $buildTempDirectory = Join-Path $releaseRoot 'temp'
+$buildIntermediateDirectory = Join-Path $releaseRoot 'obj'
 $iconPath = Resolve-NormalizedPath (Join-Path $repoRoot 'MinecraftCheatLauncher/Assets/vesper-app.ico')
 
 if ($SkipPreviousDownload -and (Test-Path -LiteralPath $releasesDirectory)) {
@@ -380,7 +405,7 @@ if ($SkipPreviousDownload -and (Test-Path -LiteralPath $releasesDirectory)) {
     Remove-Item -LiteralPath $resolvedReleasesDirectory -Recurse -Force
 }
 
-New-Item -ItemType Directory -Path $releaseRoot, $publishDirectory, $releasesDirectory, $buildTempDirectory -Force | Out-Null
+New-Item -ItemType Directory -Path $releaseRoot, $publishDirectory, $releasesDirectory, $buildTempDirectory, $buildIntermediateDirectory -Force | Out-Null
 
 $previousTemp = $env:TEMP
 $previousTmp = $env:TMP
@@ -399,6 +424,7 @@ $publishArguments = @(
     '-p:DebugType=none',
     '-p:DebugSymbols=false',
     '-p:SkipLockedLauncherCheck=true',
+    "-p:BaseIntermediateOutputPath=$buildIntermediateDirectory/",
     "-p:RestorePackagesPath=$env:NUGET_PACKAGES",
     "-p:SkipFrontendBuild=$($SkipFrontendBuild.IsPresent.ToString().ToLowerInvariant())"
 )
@@ -468,6 +494,11 @@ if ($Publish -or $UploadDraft) {
         $ReleaseName.Trim()
     }
 
+    $repoPath = Get-GitHubRepoPath -RepoUrl $RepoUrl
+    if ($ReplaceExistingRelease) {
+        Remove-GitHubReleaseByTag -RepoPath $repoPath -TagName $effectiveTagName
+    }
+
     Write-Host "Uploading Velopack release to $RepoUrl (publish=$publishValue)..."
     $uploadArguments = @(
         'tool', 'run', 'vpk', '--',
@@ -487,7 +518,6 @@ if ($Publish -or $UploadDraft) {
 
     Invoke-RepoDotnet -RepoRoot $repoRoot -Arguments $uploadArguments
 
-    $repoPath = Get-GitHubRepoPath -RepoUrl $RepoUrl
     $stableSetupPath = Join-Path $releasesDirectory $SetupFileName
     $internalSetupName = "$PackId-$Channel-Setup.exe"
 

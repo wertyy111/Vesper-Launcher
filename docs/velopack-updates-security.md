@@ -40,6 +40,14 @@ The user-facing installer is always normalized to one stable file name:
 VesperLauncherSetup.exe
 ```
 
+The standard Velopack `Setup.exe` is a one-click installer. It does not show an install-folder picker in the default UI, but it can install to another drive when launched with:
+
+```powershell
+.\VesperLauncherSetup.exe --installto "D:\Games\Vesper Launcher"
+```
+
+For a beautiful first-install experience, build a small Vesper-branded setup wrapper that lets the user choose a folder and then starts the Velopack setup with `--installto`. Do not replace the Velopack installation layout with a raw file-copy installer unless the launcher updater is changed too, because Velopack updates rely on its installed layout.
+
 Velopack update packages inside the same folder still contain the real SemVer package version in metadata. Do not edit the `Version` field inside `releases.win.json` manually, because Velopack uses it to compare updates.
 
 For public beta releases, keep GitHub names clean and human-readable. Example:
@@ -88,6 +96,7 @@ https://github.com/wertyy111/Updates-Vesper/releases/latest/download/VesperLaunc
 
 By default, `Publish-VelopackUpdate.ps1` keeps only the newest published GitHub Release:
 
+- an existing release with the same tag is deleted before replacement;
 - old releases are deleted;
 - old tags are deleted when GitHub allows it;
 - the internal Velopack setup asset is removed from the release;
