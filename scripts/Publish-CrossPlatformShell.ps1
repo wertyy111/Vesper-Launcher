@@ -12,13 +12,13 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$projectPath = Join-Path $repoRoot 'MinecraftCheatLauncher\VesperLauncher.CrossPlatform.csproj'
-$outputRoot = Join-Path $repoRoot '_build_verify\cross-platform-publish'
-$nugetRoot = Join-Path $repoRoot '_build_verify\nuget-packages'
-$temporaryRoot = Join-Path $repoRoot '_build_verify\tmp'
-$httpCacheRoot = Join-Path $repoRoot '_build_verify\nuget-http-cache'
-$dotnetHomeRoot = Join-Path $repoRoot '_build_verify\dotnet-home'
-$userBuildRoot = Join-Path $repoRoot '_build_verify\user-build-root'
+$projectPath = Join-Path (Join-Path $repoRoot 'MinecraftCheatLauncher') 'VesperLauncher.CrossPlatform.csproj'
+$outputRoot = Join-Path $repoRoot '_build_verify/cross-platform-publish'
+$nugetRoot = Join-Path $repoRoot '_build_verify/nuget-packages'
+$temporaryRoot = Join-Path $repoRoot '_build_verify/tmp'
+$httpCacheRoot = Join-Path $repoRoot '_build_verify/nuget-http-cache'
+$dotnetHomeRoot = Join-Path $repoRoot '_build_verify/dotnet-home'
+$userBuildRoot = Join-Path $repoRoot '_build_verify/user-build-root'
 
 if (-not (Test-Path $projectPath)) {
     throw "Cross-platform project was not found: $projectPath"
