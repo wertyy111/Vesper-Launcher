@@ -2522,3 +2522,150 @@ img { display: block; max-width: 100%; }
 .stat-row {
   display: none;
 }
+
+/* --- Account Panel V2 Styles --- */
+
+/* 2. Inputs */
+.account-panel-v2 .launcher-input {
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.54);
+  color: #ffffff;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+
+.account-panel-v2 .launcher-input:focus {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.68);
+}
+
+/* 3. Toggle Switch (Segmented Slider) */
+.account-panel-v2 .account-segmented-toggle {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  padding: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(198, 229, 247, 0.2);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(18, 18, 18, 0.82), rgba(0, 0, 0, 0.86)),
+    rgba(0, 0, 0, 0.82);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+  margin-bottom: 12px;
+}
+
+.account-panel-v2 .account-segmented-toggle::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  bottom: 4px;
+  z-index: 0;
+  width: calc(50% - 4px);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(218, 228, 237, 0.98));
+  box-shadow:
+    0 7px 16px rgba(0, 0, 0, 0.38),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translateX(0);
+  transition: transform 180ms cubic-bezier(0.22, 0.9, 0.25, 1);
+  will-change: transform;
+}
+
+.account-panel-v2 .account-segmented-toggle.is-right-active::before {
+  transform: translateX(100%);
+}
+
+.account-panel-v2 .account-segmented-toggle button {
+  position: relative;
+  z-index: 1;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-weight: 700;
+  text-shadow: none;
+  transition: color 150ms ease;
+  display: grid;
+  place-items: center;
+}
+
+.account-panel-v2 .account-segmented-toggle button.active {
+  background: transparent;
+  color: #11151a;
+  box-shadow: none;
+}
+
+.account-panel-v2 .account-segmented-toggle button:hover {
+  color: #ffffff;
+}
+
+.account-panel-v2 .account-segmented-toggle button.active:hover {
+  color: #11151a;
+}
+
+/* 4. Primary Button */
+.account-panel-v2 .primary-button {
+  color: #ffffff;
+  border-radius: 16px !important;
+  border: none;
+  height: 42px;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 7px 16px rgba(0, 0, 0, 0.34);
+  display: grid;
+  place-items: center;
+}
+
+.account-panel-v2 .primary-button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 6. Chip buttons */
+.account-panel-v2 .chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.account-panel-v2 .chip-button {
+  border-radius: 999px !important;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.76);
+  color: #ffffff;
+  padding: 6px 16px;
+  min-height: 32px;
+  height: auto;
+  font-size: 13px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.account-panel-v2 .chip-button:hover {
+  border-color: rgba(255, 255, 255, 0.76);
+  background: rgba(0, 0, 0, 0.72);
+}
+
+/* Red styled danger button */
+.account-panel-v2 .danger-button {
+  border-radius: 16px !important;
+  background: rgba(255, 80, 80, 0.2);
+  border-color: rgba(255, 80, 80, 0.4);
+  color: #ffcccc;
+  height: 42px;
+  display: grid;
+  place-items: center;
+}
