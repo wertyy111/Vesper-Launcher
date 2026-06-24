@@ -48,6 +48,7 @@ function App() {
   const settingsLiquidButtonRef = useRef<HTMLButtonElement | null>(null);
   const liquidGlassBatchRef = useRef(0);
   const liquidGlassResolutionRef = useRef(glassTuning.resolution);
+  const clientReadySentRef = useRef(false);
 
   const launcher = hostSnapshot?.launcher ?? null;
   const theme = launcher?.theme ?? {};
@@ -61,6 +62,19 @@ function App() {
 
   const setGlassTuningValue = (field: keyof GlassTuningSettings, value: number) => {
     setGlassTuning((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const markClientUiReady = () => {
+    if (clientReadySentRef.current) {
+      return;
+    }
+
+    clientReadySentRef.current = true;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        photinoBridge.sendCommand('client.uiReady');
+      });
+    });
   };
 
   useEffect(() => {
@@ -161,9 +175,23 @@ function App() {
   }, [versionMenuOpen]);
 
   useEffect(() => {
-    if (loadingState || !settingsLiquidButtonRef.current) return;
+    if (loadingState) return;
 
     let cancelled = false;
+    const readyFallbackId = window.setTimeout(() => {
+      if (!cancelled) {
+        markClientUiReady();
+      }
+    }, 8000);
+
+    if (!settingsLiquidButtonRef.current) {
+      markClientUiReady();
+      return () => {
+        cancelled = true;
+        window.clearTimeout(readyFallbackId);
+      };
+    }
+
     const loadScript = (src: string, id: string) => new Promise<void>((resolve, reject) => {
       const existingScript = document.querySelector<HTMLScriptElement>(`script[data-vesper-vendor="${id}"]`);
       if (existingScript) {
@@ -196,6 +224,7 @@ function App() {
         await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
 
         if (cancelled || !settingsLiquidButtonRef.current || !window.liquidGL) {
+          markClientUiReady();
           return;
         }
 
@@ -203,6 +232,7 @@ function App() {
           .filter((element) => element.offsetWidth > 0 && element.offsetHeight > 0);
 
         if (!targets.length) {
+          markClientUiReady();
           return;
         }
 
@@ -226,14 +256,19 @@ function App() {
           tilt: false,
           magnify: 1
         });
+
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 650));
+        markClientUiReady();
       } catch (error) {
         console.warn('liquidGL controls test failed', error);
+        markClientUiReady();
       }
     };
 
     initializeLiquidSettingsButton();
     return () => {
       cancelled = true;
+      window.clearTimeout(readyFallbackId);
     };
   }, [loadingState, activeSection, versionMenuOpen]);
 

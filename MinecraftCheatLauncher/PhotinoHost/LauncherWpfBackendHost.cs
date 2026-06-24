@@ -8,11 +8,11 @@ using System.Windows.Threading;
 
 namespace MinecraftCheatLauncher.PhotinoHost;
 
-internal sealed class LauncherWpfBackendHost : IDisposable
+internal sealed class LauncherWpfBackendHost : ILauncherBackendHost
 {
     private const double HiddenHostLeft = -32000;
     private const double HiddenHostTop = -32000;
-    private const int MinimumStartupUpdateWindowVisibleMs = 0;
+    private const int MinimumStartupUpdateWindowVisibleMs = 1200;
     private readonly TaskCompletionSource<object?> _startedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<bool> _launcherReadyTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly string _logPath = Path.Combine(AppContext.BaseDirectory, "photino-host.log");
@@ -67,6 +67,12 @@ internal sealed class LauncherWpfBackendHost : IDisposable
     {
         return InvokeAsync(async () =>
         {
+            if (string.Equals(command, "host.closeSplash", StringComparison.OrdinalIgnoreCase))
+            {
+                CloseStartupUpdateWindow();
+                return;
+            }
+
             if (_mainWindow is null)
             {
                 if (string.Equals(command, "host.syncBounds", StringComparison.OrdinalIgnoreCase))
@@ -263,6 +269,8 @@ internal sealed class LauncherWpfBackendHost : IDisposable
             }
 
             _phase = "updating";
+            _launcherReadyTcs.TrySetResult(false);
+            _application?.Shutdown();
         }
         catch (Exception ex)
         {
@@ -410,7 +418,14 @@ internal sealed class LauncherWpfBackendHost : IDisposable
         }
 
         _phase = "initializing-launcher";
-        CloseStartupUpdateWindow();
+        _updateState = new LauncherUpdateUiState
+        {
+            Message = "Запуск лаунчера...",
+            DetailMessage = "Загрузка и подготовка интерфейса...",
+            IsIndeterminate = true,
+            ProgressText = "Загрузка..."
+        };
+        UpdateStartupUpdateWindow(_updateState);
 
         var window = new MainWindow();
         window.PrepareForPhotinoHost();
