@@ -19,9 +19,9 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using MinecraftCheatLauncher.Platform;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace MinecraftCheatLauncher.Launcher;
 
@@ -65,11 +65,9 @@ public sealed class MinecraftLauncherService
     private static readonly Regex TokenRegex = new("\"([^\"]*)\"|(\\S+)", RegexOptions.Compiled);
     private static readonly Regex JavaVersionRegex = new("version\\s+\"(?<version>[^\"]+)\"", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex MinecraftVersionRegex = new("\\d+\\.\\d+(?:\\.\\d+)?", RegexOptions.Compiled);
+    private static readonly IPlatformPathService PlatformPaths = PlatformServiceFactory.CreateCurrent().Paths;
     private static readonly Lazy<string> BaseStorageDirectory = new(ResolveBaseStorageDirectory, isThreadSafe: true);
-    private static readonly string VersionManifestCachePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "VesperLauncher",
-        "version-manifest-cache.json");
+    private static readonly string VersionManifestCachePath = LauncherDataPaths.GetDataFilePath("version-manifest-cache.json");
     private static readonly string ModrinthCatalogCachePath = Path.Combine(
         BaseStorageDirectory.Value,
         ".launcher-cache",
@@ -97,6 +95,8 @@ public sealed class MinecraftLauncherService
         string FileName,
         IReadOnlyList<string> SupportedVersions);
     private sealed record VersionManifestCache(DateTimeOffset FetchedAt, List<MinecraftVersionEntry> Versions);
+    private readonly record struct SkinRect(int X, int Y, int Width, int Height);
+    private sealed record SkinTexture(int Width, int Height, byte[] Pixels);
     private static ModrinthCatalogCacheState? _modrinthCatalogCacheState;
     private static readonly IReadOnlyList<OptiFabricDownloadInfo> OptiFabricDownloads =
     [
@@ -250,10 +250,7 @@ public sealed class MinecraftLauncherService
     ];
     private static LocalSkinHttpServer? LocalSkinHost;
     private static VesperAuthHttpServer? VesperAuthServer;
-    private static readonly string MineSkinCachePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "VesperLauncher",
-        "mineskin-cache.json");
+    private static readonly string MineSkinCachePath = LauncherDataPaths.GetDataFilePath("mineskin-cache.json");
     private static readonly string[] LegacyCustomGameDirectories =
     [
         @"D:\Новая папка (2)\Minecraft\game"
@@ -618,6 +615,11 @@ public sealed class MinecraftLauncherService
     private static string ResolveLauncherTemporaryDirectory(params string[] relativeSegments)
     {
         var candidates = new List<string>();
+        var platformCacheDirectory = PlatformPaths.GetLauncherCacheDirectory();
+        if (!string.IsNullOrWhiteSpace(platformCacheDirectory))
+        {
+            candidates.Add(Path.Combine(new[] { platformCacheDirectory, "temp" }.Concat(relativeSegments).ToArray()));
+        }
 
         if (!string.IsNullOrWhiteSpace(BaseStorageDirectory.Value))
         {
@@ -638,7 +640,8 @@ public sealed class MinecraftLauncherService
             candidates.Add(Path.Combine(new[] { tempRoot, "VesperLauncher" }.Concat(relativeSegments).ToArray()));
         }
 
-        foreach (var candidate in candidates.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase))
+        var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        foreach (var candidate in candidates.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(comparer))
         {
             try
             {
@@ -2929,10 +2932,15 @@ public sealed class MinecraftLauncherService
         AddIfExists(result, Path.Combine(BaseStorageDirectory.Value, "minecraft_vanilla"));
         AddIfExists(result, Path.Combine(BaseStorageDirectory.Value, "minecraft_cheat"));
 
-        var appDataDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        AddIfExists(result, Path.Combine(appDataDirectory, ".minecraft"));
-        AddIfExists(result, Path.Combine(appDataDirectory, ".tlauncher", "legacy", "Minecraft", "game"));
-        AddIfExists(result, Path.Combine(appDataDirectory, ".tlauncher", "Minecraft", "game"));
+        AddIfExists(result, PlatformPaths.MinecraftDirectory);
+
+        if (OperatingSystem.IsWindows())
+        {
+            var appDataDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            AddIfExists(result, Path.Combine(appDataDirectory, ".minecraft"));
+            AddIfExists(result, Path.Combine(appDataDirectory, ".tlauncher", "legacy", "Minecraft", "game"));
+            AddIfExists(result, Path.Combine(appDataDirectory, ".tlauncher", "Minecraft", "game"));
+        }
 
         return result.Distinct(StringComparer.OrdinalIgnoreCase);
     }
@@ -4905,6 +4913,11 @@ public sealed class MinecraftLauncherService
     private static string ResolveForgeInstallerWorkspaceRoot()
     {
         var candidates = new List<string>();
+        var platformCacheDirectory = PlatformPaths.GetLauncherCacheDirectory();
+        if (!string.IsNullOrWhiteSpace(platformCacheDirectory))
+        {
+            candidates.Add(Path.Combine(platformCacheDirectory, "forge-installer"));
+        }
 
         try
         {
@@ -4947,10 +4960,7 @@ public sealed class MinecraftLauncherService
 
     private static async Task<string> EnsureAuthlibInjectorAsync(CancellationToken cancellationToken)
     {
-        var authlibDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VesperLauncher",
-            "authlib-injector");
+        var authlibDirectory = Path.Combine(LauncherDataPaths.GetPreferredDataDirectory(), "authlib-injector");
         Directory.CreateDirectory(authlibDirectory);
 
         await AuthlibInjectorInstallLock.WaitAsync(cancellationToken);
@@ -7215,13 +7225,13 @@ public sealed class MinecraftLauncherService
     {
         try
         {
-            var sourceBitmap = LoadSkinBitmapForLaunch(fullSkinPath);
-            if (sourceBitmap is null)
+            var sourceTexture = LoadSkinTextureForLaunch(fullSkinPath);
+            if (sourceTexture is null)
             {
                 return fullSkinPath;
             }
 
-            var preparedBitmap = PrepareSkinBitmapForLaunch(sourceBitmap, isSlimModel);
+            var preparedTexture = PrepareSkinTextureForLaunch(sourceTexture, isSlimModel);
             var preparedDirectory = Path.Combine(BaseStorageDirectory.Value, ".launcher-cache", "prepared-skins");
             Directory.CreateDirectory(preparedDirectory);
 
@@ -7229,10 +7239,11 @@ public sealed class MinecraftLauncherService
                 preparedDirectory,
                 $"{ComputeFileHashForName(fullSkinPath)}-{(isSlimModel ? "slim" : "classic")}.png");
 
-            using var stream = File.Create(preparedPath);
-            var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(preparedBitmap));
-            encoder.Save(stream);
+            using var image = Image.LoadPixelData<Rgba32>(
+                preparedTexture.Pixels,
+                preparedTexture.Width,
+                preparedTexture.Height);
+            image.SaveAsPng(preparedPath);
             return File.Exists(preparedPath) ? preparedPath : fullSkinPath;
         }
         catch
@@ -7241,38 +7252,26 @@ public sealed class MinecraftLauncherService
         }
     }
 
-    private static BitmapSource? LoadSkinBitmapForLaunch(string skinPath)
+    private static SkinTexture? LoadSkinTextureForLaunch(string skinPath)
     {
         try
         {
-            using var stream = File.OpenRead(skinPath);
-            var decoder = new PngBitmapDecoder(
-                stream,
-                BitmapCreateOptions.PreservePixelFormat,
-                BitmapCacheOption.OnLoad);
-            if (decoder.Frames.Count == 0)
+            using var image = Image.Load<Rgba32>(skinPath);
+            if (image.Width < 64 || image.Height < 32)
             {
                 return null;
             }
 
-            var source = decoder.Frames[0];
-            if (source.PixelWidth < 64 || source.PixelHeight < 32)
-            {
-                return null;
-            }
-
-            var isModernLayout = source.PixelWidth == source.PixelHeight;
-            var isLegacyLayout = source.PixelWidth == source.PixelHeight * 2;
+            var isModernLayout = image.Width == image.Height;
+            var isLegacyLayout = image.Width == image.Height * 2;
             if (!isModernLayout && !isLegacyLayout)
             {
                 return null;
             }
 
-            BitmapSource bitmap = source.Format == PixelFormats.Bgra32
-                ? source
-                : new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
-            bitmap.Freeze();
-            return bitmap;
+            var pixels = new byte[image.Width * image.Height * 4];
+            image.CopyPixelDataTo(pixels);
+            return new SkinTexture(image.Width, image.Height, pixels);
         }
         catch
         {
@@ -7280,13 +7279,11 @@ public sealed class MinecraftLauncherService
         }
     }
 
-    private static BitmapSource PrepareSkinBitmapForLaunch(BitmapSource source, bool isSlimModel)
+    private static SkinTexture PrepareSkinTextureForLaunch(SkinTexture source, bool isSlimModel)
     {
-        var width = source.PixelWidth;
-        var height = source.PixelHeight;
-        var stride = width * 4;
-        var pixels = new byte[stride * height];
-        source.CopyPixels(pixels, stride, 0);
+        var width = source.Width;
+        var height = source.Height;
+        var pixels = (byte[])source.Pixels.Clone();
 
         ResolveSkinLayoutScale(width, height, out var scaleX, out var scaleY);
         var isModernLayout = width == height;
@@ -7294,17 +7291,7 @@ public sealed class MinecraftLauncherService
         BakeSkinOverlayIntoBasePixels(pixels, width, height, scaleX, scaleY, isModernLayout, isSlimModel);
         EnsureBaseSkinOpacity(pixels, width, height, scaleX, scaleY, isModernLayout, isSlimModel);
 
-        var prepared = BitmapSource.Create(
-            width,
-            height,
-            source.DpiX,
-            source.DpiY,
-            PixelFormats.Bgra32,
-            palette: null,
-            pixels,
-            stride);
-        prepared.Freeze();
-        return prepared;
+        return new SkinTexture(width, height, pixels);
     }
 
     private static void ResolveSkinLayoutScale(int textureWidth, int textureHeight, out double scaleX, out double scaleY)
@@ -7315,13 +7302,13 @@ public sealed class MinecraftLauncherService
             : textureHeight / 64d;
     }
 
-    private static Int32Rect ScaleSkinRect(int x, int y, int rectWidth, int rectHeight, double scaleX, double scaleY)
+    private static SkinRect ScaleSkinRect(int x, int y, int rectWidth, int rectHeight, double scaleX, double scaleY)
     {
         var scaledX = Math.Max(0, (int)Math.Round(x * scaleX));
         var scaledY = Math.Max(0, (int)Math.Round(y * scaleY));
         var scaledWidth = Math.Max(1, (int)Math.Round(rectWidth * scaleX));
         var scaledHeight = Math.Max(1, (int)Math.Round(rectHeight * scaleY));
-        return new Int32Rect(scaledX, scaledY, scaledWidth, scaledHeight);
+        return new SkinRect(scaledX, scaledY, scaledWidth, scaledHeight);
     }
 
     private static void BakeSkinOverlayIntoBasePixels(
@@ -7427,7 +7414,7 @@ public sealed class MinecraftLauncherService
                 : ScaleSkinRect(32, 48, 16, 16, scaleX, scaleY));
     }
 
-    private static void CopyVisibleSkinPixels(byte[] pixels, int width, int height, Int32Rect sourceRect, Int32Rect destinationRect)
+    private static void CopyVisibleSkinPixels(byte[] pixels, int width, int height, SkinRect sourceRect, SkinRect destinationRect)
     {
         var copyWidth = Math.Min(sourceRect.Width, destinationRect.Width);
         var copyHeight = Math.Min(sourceRect.Height, destinationRect.Height);
@@ -7461,7 +7448,7 @@ public sealed class MinecraftLauncherService
         }
     }
 
-    private static void MakeSkinRegionOpaque(byte[] pixels, int width, int height, Int32Rect region)
+    private static void MakeSkinRegionOpaque(byte[] pixels, int width, int height, SkinRect region)
     {
         var stride = width * 4;
         var maxX = Math.Min(width, region.X + region.Width);
@@ -12553,20 +12540,39 @@ public sealed class MinecraftLauncherService
 
     private static string ResolveBaseStorageDirectory()
     {
-        var launcherDataPath = Path.Combine(AppContext.BaseDirectory, "GameData");
-        try
+        var candidates = new List<string>();
+
+        if (OperatingSystem.IsWindows())
         {
-            Directory.CreateDirectory(launcherDataPath);
-            return launcherDataPath;
-        }
-        catch
-        {
-            // Fallback when the launcher folder is read-only.
+            candidates.Add(Path.Combine(AppContext.BaseDirectory, "GameData"));
         }
 
-        var fallbackPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CheatCraftLauncherData");
-        Directory.CreateDirectory(fallbackPath);
-        return fallbackPath;
+        candidates.Add(Path.Combine(LauncherDataPaths.GetPreferredDataDirectory(), "GameData"));
+        candidates.Add(Path.Combine(AppContext.BaseDirectory, "GameData"));
+
+        var localApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (!string.IsNullOrWhiteSpace(localApplicationData))
+        {
+            candidates.Add(Path.Combine(localApplicationData, "CheatCraftLauncherData"));
+        }
+
+        candidates.Add(Path.Combine(Path.GetTempPath(), "CheatCraftLauncherData"));
+
+        var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        foreach (var candidate in candidates.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(comparer))
+        {
+            try
+            {
+                Directory.CreateDirectory(candidate);
+                return candidate;
+            }
+            catch
+            {
+                // Fallback when the launcher folder is read-only.
+            }
+        }
+
+        throw new IOException("Не удалось подготовить папку данных лаунчера.");
     }
 
     private static string SanitizePathSegment(string value)

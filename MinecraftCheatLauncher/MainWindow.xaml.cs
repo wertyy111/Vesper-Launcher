@@ -29,12 +29,15 @@ using BlurredBackgroundEffect = BlurredBackground.WPF.BlurredBackground;
 using Microsoft.Win32;
 using MinecraftCheatLauncher.Core;
 using MinecraftCheatLauncher.Launcher;
+using MinecraftCheatLauncher.Platform;
 using Open.Nat;
 
 namespace MinecraftCheatLauncher;
 
 public partial class MainWindow : Window
 {
+    private static readonly IPlatformService PlatformService = PlatformServiceFactory.CreateCurrent();
+
     private enum BackgroundSceneKind
     {
         Unknown,
@@ -84,6 +87,7 @@ public partial class MainWindow : Window
     private const int MaxAccountRecentUsernames = 3;
     private const int MaxFriends = 80;
     private const int MinAccountPasswordLength = 6;
+    private const int MaxCloudAvatarBytes = 240 * 1024;
     private const int PasswordHashIterations = 120_000;
     private const string VesperNetServiceName = "VesperNetService";
     private const string VesperNetHealthUrl = "http://127.0.0.1:37851/health";
@@ -659,8 +663,7 @@ public partial class MainWindow : Window
 
     private bool HasIncognitoIdentity()
     {
-        return _guestIdentityState is not null &&
-               !string.IsNullOrWhiteSpace(_guestIdentityState.Username);
+        return false;
     }
 
     private bool IsIncognitoOnlyMode()
@@ -841,37 +844,16 @@ public partial class MainWindow : Window
     private void LoadGuestIdentityState()
     {
         _guestIdentityState = null;
-        if (!File.Exists(_guestIdentityStatePath))
-        {
-            return;
-        }
-
         try
         {
-            var json = File.ReadAllText(_guestIdentityStatePath);
-            var loaded = JsonSerializer.Deserialize<GuestIdentityState>(json);
-            if (loaded is null)
+            if (File.Exists(_guestIdentityStatePath))
             {
-                return;
+                File.Delete(_guestIdentityStatePath);
             }
-
-            var normalizedUsername = NormalizeMinecraftUsername(loaded.Username);
-            if (!UsernameRegex.IsMatch(normalizedUsername))
-            {
-                return;
-            }
-
-            _guestIdentityState = new GuestIdentityState
-            {
-                Username = normalizedUsername,
-                CreatedAtUtc = string.IsNullOrWhiteSpace(loaded.CreatedAtUtc)
-                    ? DateTimeOffset.UtcNow.ToString("O")
-                    : loaded.CreatedAtUtc
-            };
         }
         catch (Exception ex)
         {
-            TryWriteErrorToLog(ex, "Ошибка загрузки инкогнито-профиля");
+            TryWriteErrorToLog(ex, "Ошибка удаления устаревшего инкогнито-профиля");
         }
     }
 
@@ -920,29 +902,7 @@ public partial class MainWindow : Window
 
     private void SaveGuestIdentityState()
     {
-        if (_guestIdentityState is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var accountDirectory = Path.GetDirectoryName(_guestIdentityStatePath);
-            if (!string.IsNullOrWhiteSpace(accountDirectory))
-            {
-                Directory.CreateDirectory(accountDirectory);
-            }
-
-            var json = JsonSerializer.Serialize(_guestIdentityState, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
-            File.WriteAllText(_guestIdentityStatePath, json);
-        }
-        catch (Exception ex)
-        {
-            TryWriteErrorToLog(ex, "Ошибка сохранения инкогнито-профиля");
-        }
+        ClearGuestIdentityState();
     }
 
     private void ClearGuestIdentityState()
@@ -1154,7 +1114,7 @@ public partial class MainWindow : Window
             AccountPasswordBox.Password = string.Empty;
             LoginAccountButton.IsEnabled = true;
             CreateAccountButton.IsEnabled = true;
-            EnterIncognitoButton.IsEnabled = true;
+            EnterIncognitoButton.IsEnabled = false;
             CreateAccountButton.Content = "Регистрация";
             ChangeAvatarButton.Content = "Сменить ник";
             LogoutAccountButton.Content = "Выйти из инкогнито";
@@ -1208,7 +1168,7 @@ public partial class MainWindow : Window
         AccountPasswordBox.Password = string.Empty;
         LoginAccountButton.IsEnabled = true;
         CreateAccountButton.IsEnabled = true;
-        EnterIncognitoButton.IsEnabled = true;
+        EnterIncognitoButton.IsEnabled = false;
         CreateAccountButton.Content = "Регистрация";
         ChangeAvatarButton.Content = "Сменить аватар";
         LogoutAccountButton.Content = "Выйти из аккаунта";
@@ -1352,9 +1312,32 @@ public partial class MainWindow : Window
 
     private static string GetLegacyLauncherAppDataDirectory(bool ensureExists = true)
     {
+        return LauncherDataPaths.GetLegacyWindowsDataDirectory(ensureExists);
+    }
+
+    private static string GetPreferredLauncherDataDirectory()
+    {
+        return LauncherDataPaths.GetPreferredDataDirectory();
+    }
+
+    private static string GetLauncherDataFilePath(string fileName)
+    {
+        return LauncherDataPaths.GetDataFilePath(fileName);
+    }
+
+    private static void TryMigrateFilesToLauncherDirectory(
+        string sourceDirectory,
+        string destinationDirectory,
+        string searchPattern = "*.*")
+    {
+        LauncherDataPaths.MigrateDirectoryContents(sourceDirectory, destinationDirectory, searchPattern);
+    }
+
+    private static string GetLegacyAccountAvatarsDirectory(bool ensureExists = true)
+    {
         var path = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VesperLauncher");
+            GetLegacyLauncherAppDataDirectory(ensureExists),
+            "avatars");
         if (ensureExists)
         {
             Directory.CreateDirectory(path);
@@ -1363,78 +1346,10 @@ public partial class MainWindow : Window
         return path;
     }
 
-    private static string GetPreferredLauncherDataDirectory()
-    {
-        var installLocalPath = Path.Combine(AppContext.BaseDirectory, ".launcher-data");
-        try
-        {
-            Directory.CreateDirectory(installLocalPath);
-            return installLocalPath;
-        }
-        catch
-        {
-            return GetLegacyLauncherAppDataDirectory();
-        }
-    }
-
-    private static string GetLauncherDataFilePath(string fileName)
-    {
-        var preferredDirectory = GetPreferredLauncherDataDirectory();
-        var preferredPath = Path.Combine(preferredDirectory, fileName);
-        if (File.Exists(preferredPath))
-        {
-            return preferredPath;
-        }
-
-        try
-        {
-            var legacyPath = Path.Combine(GetLegacyLauncherAppDataDirectory(ensureExists: false), fileName);
-            if (File.Exists(legacyPath))
-            {
-                Directory.CreateDirectory(preferredDirectory);
-                File.Copy(legacyPath, preferredPath, overwrite: false);
-            }
-        }
-        catch
-        {
-            // Keep launcher usable even if migration fails.
-        }
-
-        return preferredPath;
-    }
-
-    private static void TryMigrateFilesToLauncherDirectory(
-        string sourceDirectory,
-        string destinationDirectory,
-        string searchPattern = "*.*")
-    {
-        try
-        {
-            if (!Directory.Exists(sourceDirectory))
-            {
-                return;
-            }
-
-            Directory.CreateDirectory(destinationDirectory);
-            foreach (var sourceFilePath in Directory.EnumerateFiles(sourceDirectory, searchPattern, SearchOption.TopDirectoryOnly))
-            {
-                var destinationPath = Path.Combine(destinationDirectory, Path.GetFileName(sourceFilePath));
-                if (!File.Exists(destinationPath))
-                {
-                    File.Copy(sourceFilePath, destinationPath, overwrite: false);
-                }
-            }
-        }
-        catch
-        {
-            // Keep launcher usable even if migration fails.
-        }
-    }
-
-    private static string GetLegacyAccountAvatarsDirectory()
+    private static string GetInstallLocalAccountAvatarsDirectory()
     {
         var path = Path.Combine(
-            GetLegacyLauncherAppDataDirectory(),
+            LauncherDataPaths.GetInstallLocalDataDirectory(),
             "avatars");
         Directory.CreateDirectory(path);
         return path;
@@ -1446,7 +1361,7 @@ public partial class MainWindow : Window
             GetPreferredLauncherDataDirectory(),
             "avatars");
         Directory.CreateDirectory(path);
-        TryMigrateFilesToLauncherDirectory(GetLegacyAccountAvatarsDirectory(), path);
+        TryMigrateFilesToLauncherDirectory(GetLegacyAccountAvatarsDirectory(ensureExists: false), path);
         return path;
     }
 
@@ -1487,7 +1402,7 @@ public partial class MainWindow : Window
             return currentAvatarPath;
         }
 
-        var legacyAvatarPath = Path.Combine(GetLegacyAccountAvatarsDirectory(), avatarFileName);
+        var legacyAvatarPath = Path.Combine(GetLegacyAccountAvatarsDirectory(ensureExists: false), avatarFileName);
         if (!File.Exists(legacyAvatarPath))
         {
             return null;
@@ -1653,7 +1568,10 @@ public partial class MainWindow : Window
     private static string BuildCloudAvatarCacheFileName(string username, CloudAvatarPayload? avatar)
     {
         var normalizedUsername = Regex.Replace(username.ToLowerInvariant(), @"[^a-z0-9_\-]+", "_");
-        var cacheStampSource = $"{avatar?.UpdatedAtUtc}|{avatar?.ImageUrl}|{avatar?.ByteLength}|{avatar?.ContentType}";
+        var imageBase64Hash = string.IsNullOrWhiteSpace(avatar?.ImageBase64)
+            ? string.Empty
+            : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(avatar.ImageBase64))).ToLowerInvariant();
+        var cacheStampSource = $"{avatar?.UpdatedAtUtc}|{avatar?.ImageUrl}|{avatar?.ByteLength}|{avatar?.ContentType}|{imageBase64Hash}";
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(cacheStampSource));
         var cacheStamp = Convert.ToHexString(hashBytes)[..12].ToLowerInvariant();
         return $"{normalizedUsername}-cloud-avatar-{cacheStamp}{GetAvatarFileExtension(avatar?.ContentType)}";
@@ -1666,11 +1584,18 @@ public partial class MainWindow : Window
             return null;
         }
 
-        var cacheDirectory = GetCloudAvatarCacheDirectory();
-        var cachePath = Path.Combine(cacheDirectory, BuildCloudAvatarCacheFileName(username, avatar));
-        return File.Exists(cachePath)
-            ? cachePath
-            : null;
+        try
+        {
+            var cacheDirectory = GetCloudAvatarCacheDirectory();
+            var cachePath = Path.Combine(cacheDirectory, BuildCloudAvatarCacheFileName(username, avatar));
+            return File.Exists(cachePath)
+                ? cachePath
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private BitmapSource? TryLoadCloudAvatarBitmap(string username, CloudAvatarPayload? avatar, int decodePixelWidth)
@@ -1712,7 +1637,10 @@ public partial class MainWindow : Window
 
         if (string.IsNullOrWhiteSpace(avatar.ImageBase64))
         {
-            return null;
+            return Uri.TryCreate(avatar.ImageUrl, UriKind.Absolute, out var imageUri) &&
+                (imageUri.Scheme == Uri.UriSchemeHttps || imageUri.Scheme == Uri.UriSchemeHttp)
+                ? imageUri.ToString()
+                : null;
         }
 
         try
@@ -1725,7 +1653,10 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             TryWriteErrorToLog(ex, "Ошибка кеширования base64-аватара друга");
-            return null;
+            return Uri.TryCreate(avatar.ImageUrl, UriKind.Absolute, out var imageUri) &&
+                (imageUri.Scheme == Uri.UriSchemeHttps || imageUri.Scheme == Uri.UriSchemeHttp)
+                ? imageUri.ToString()
+                : null;
         }
     }
 
@@ -2192,15 +2123,30 @@ public partial class MainWindow : Window
 
     private static byte[] ConvertImageFileToPngBytes(string sourcePath, int targetSize)
     {
-        var bitmap = LoadBitmapFromFile(sourcePath, decodePixelWidth: Math.Max(targetSize, 256));
-        var squareBitmap = CreateSquareIconBitmap(bitmap, targetSize);
+        var requestedSize = Math.Max(64, targetSize);
+        var bitmap = LoadBitmapFromFile(sourcePath, decodePixelWidth: Math.Max(requestedSize, 256));
 
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(squareBitmap));
+        foreach (var size in new[] { requestedSize, 192, 160, 128, 96 })
+        {
+            if (size > requestedSize)
+            {
+                continue;
+            }
 
-        using var stream = new MemoryStream();
-        encoder.Save(stream);
-        return stream.ToArray();
+            var squareBitmap = CreateSquareIconBitmap(bitmap, size);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(squareBitmap));
+
+            using var stream = new MemoryStream();
+            encoder.Save(stream);
+            var bytes = stream.ToArray();
+            if (bytes.Length <= MaxCloudAvatarBytes || size == 96)
+            {
+                return bytes;
+            }
+        }
+
+        throw new InvalidOperationException("Не удалось подготовить аватар подходящего размера.");
     }
 
     private string SaveAvatarBytesToLocalProfile(string username, byte[] avatarBytes)
@@ -2226,10 +2172,10 @@ public partial class MainWindow : Window
         }
         catch when (!string.Equals(
                          Path.GetFullPath(avatarsDirectory).TrimEnd(Path.DirectorySeparatorChar),
-                         Path.GetFullPath(GetLegacyAccountAvatarsDirectory()).TrimEnd(Path.DirectorySeparatorChar),
+                         Path.GetFullPath(GetInstallLocalAccountAvatarsDirectory()).TrimEnd(Path.DirectorySeparatorChar),
                          StringComparison.OrdinalIgnoreCase))
         {
-            var fallbackDirectory = GetLegacyAccountAvatarsDirectory();
+            var fallbackDirectory = GetInstallLocalAccountAvatarsDirectory();
             foreach (var oldAvatarPath in Directory.EnumerateFiles(fallbackDirectory, searchPattern))
             {
                 if (string.Equals(oldAvatarPath, Path.Combine(fallbackDirectory, avatarFileName), StringComparison.OrdinalIgnoreCase))
@@ -2656,6 +2602,7 @@ public partial class MainWindow : Window
             {
                 PropertyNameCaseInsensitive = true
             });
+            TryWriteLauncherDiagnosticLog($"Account login succeeded for '{username}'.");
             return new CloudAuthRequestResult(
                 true,
                 null,
@@ -2786,6 +2733,7 @@ public partial class MainWindow : Window
                 return new CloudAuthRequestResult(false, "Не настроен адрес входа в аккаунт.", null, null, null);
             }
 
+            TryWriteLauncherDiagnosticLog($"Account login started for '{username}' via {loginUrl}.");
             using var request = new HttpRequestMessage(HttpMethod.Post, loginUrl);
             ApplyConfiguredHeaders(request, config);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -2826,6 +2774,7 @@ public partial class MainWindow : Window
             var responseBody = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode)
             {
+                TryWriteLauncherDiagnosticLog($"Account login failed for '{username}'. HTTP {(int)response.StatusCode}: {responseBody}");
                 var fallbackMessage = response.StatusCode == HttpStatusCode.Unauthorized
                     ? "Неверный ник или пароль."
                     : $"Не удалось войти в аккаунт. HTTP {(int)response.StatusCode}.";
@@ -3038,6 +2987,19 @@ public partial class MainWindow : Window
 
     private async Task RefreshVesperNetStatusAsync(bool logErrors = false)
     {
+        if (!PlatformService.Features.SupportsVesperNetService)
+        {
+            _vesperNetDiagnosticState = new VesperNetDiagnosticState(
+                false,
+                false,
+                false,
+                null,
+                null,
+                "VesperNet: недоступен на этой платформе. Используется обычное подключение.");
+            UpdateVesperNetStatusText();
+            return;
+        }
+
         try
         {
             var isInstalled = IsVesperNetServiceInstalled();
@@ -3110,6 +3072,11 @@ public partial class MainWindow : Window
 
     private static bool IsVesperNetServiceInstalled()
     {
+        if (!PlatformService.Features.SupportsVesperNetService)
+        {
+            return false;
+        }
+
         try
         {
             using var serviceKey = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{VesperNetServiceName}");
@@ -3193,6 +3160,11 @@ public partial class MainWindow : Window
 
     private static async Task<bool> CanUseVesperNetOverlayLocallyAsync()
     {
+        if (!PlatformService.Features.SupportsVesperNetService)
+        {
+            return false;
+        }
+
         var health = await QueryVesperNetHealthAsync();
         return health is not null &&
                health.Ok &&
@@ -4409,10 +4381,12 @@ public partial class MainWindow : Window
                 await SubmitCreateAccountAsync(username, password);
                 break;
             case AccountEntryMode.Guest:
-                await SubmitIncognitoAsync(username);
+                ClearGuestIdentityState();
+                SetAccountEntryMode(AccountEntryMode.Login);
+                SetStatus("Гостевой режим отключен. Войди или зарегистрируйся.");
                 break;
             default:
-                SetStatus("Сначала выбери: вход, регистрация или игра без аккаунта.");
+                SetStatus("Сначала выбери: вход или регистрация.");
                 break;
         }
     }
@@ -4429,38 +4403,36 @@ public partial class MainWindow : Window
         var normalizedUsername = NormalizeMinecraftUsername(enteredUsername);
         if (string.IsNullOrWhiteSpace(normalizedUsername) || !UsernameRegex.IsMatch(normalizedUsername))
         {
-            MessageBox.Show(
-                this,
+            ShowAccountNotice(
                 "Ник должен быть 3-16 символов и содержать только A-Z, a-z, 0-9 или _.",
-                "Некорректный ник",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                "Некорректный ник");
             return;
         }
 
         var password = passwordOverride ?? AccountPasswordBox.Password;
         if (string.IsNullOrWhiteSpace(password) || password.Length < MinAccountPasswordLength)
         {
-            MessageBox.Show(
-                this,
+            ShowAccountNotice(
                 $"Пароль должен быть минимум {MinAccountPasswordLength} символов.",
-                "Слабый пароль",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                "Слабый пароль");
             return;
         }
 
+        CloudAuthRequestResult registerResult;
         SetBusy(true, "Регистрирую аккаунт...");
-        var registerResult = await RegisterCloudAccountAsync(normalizedUsername, password);
-        SetBusy(false);
+        try
+        {
+            registerResult = await RegisterCloudAccountAsync(normalizedUsername, password);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
         if (!registerResult.Success)
         {
-            MessageBox.Show(
-                this,
+            ShowAccountNotice(
                 registerResult.ErrorMessage ?? "Не удалось зарегистрировать аккаунт.",
-                "Ошибка регистрации",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                "Ошибка регистрации");
             SetStatus("Ошибка регистрации аккаунта.");
             return;
         }
@@ -4475,14 +4447,12 @@ public partial class MainWindow : Window
             registerResult.ExpiresAtUtc);
         ClearGuestIdentityState();
         SaveAccountState();
-        await TrySyncCloudProfileAsync();
-        await SyncPresenceAndFriendsAsync();
-
         UsernameTextBox.Text = resolvedUsername;
         AddOrPromoteSavedUsername(resolvedUsername);
         ApplyAccountUiState();
         HideSidePanel();
         SetStatus($"Аккаунт создан: {resolvedUsername}.");
+        _ = SyncCloudAccountAfterAuthenticationAsync();
     }
 
     private async Task SubmitLoginAccountAsync(string? usernameOverride = null, string? passwordOverride = null)
@@ -4497,38 +4467,36 @@ public partial class MainWindow : Window
         var normalizedUsername = NormalizeMinecraftUsername(enteredUsername);
         if (string.IsNullOrWhiteSpace(normalizedUsername) || !UsernameRegex.IsMatch(normalizedUsername))
         {
-            MessageBox.Show(
-                this,
+            ShowAccountNotice(
                 "Ник должен быть 3-16 символов и содержать только A-Z, a-z, 0-9 или _.",
-                "Некорректный ник",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                "Некорректный ник");
             return;
         }
 
         var password = passwordOverride ?? AccountPasswordBox.Password;
         if (string.IsNullOrWhiteSpace(password) || password.Length < MinAccountPasswordLength)
         {
-            MessageBox.Show(
-                this,
+            ShowAccountNotice(
                 $"Пароль должен быть минимум {MinAccountPasswordLength} символов.",
-                "Некорректный пароль",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                "Некорректный пароль");
             return;
         }
 
+        CloudAuthRequestResult loginResult;
         SetBusy(true, "Выполняю вход...");
-        var loginResult = await LoginCloudAccountAsync(normalizedUsername, password);
-        SetBusy(false);
+        try
+        {
+            loginResult = await LoginCloudAccountAsync(normalizedUsername, password);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
         if (!loginResult.Success)
         {
-            MessageBox.Show(
-                this,
+            ShowAccountNotice(
                 loginResult.ErrorMessage ?? "Не удалось войти в аккаунт.",
-                "Ошибка входа",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                "Ошибка входа");
             SetStatus("Ошибка входа в аккаунт.");
             return;
         }
@@ -4543,14 +4511,43 @@ public partial class MainWindow : Window
             loginResult.ExpiresAtUtc);
         ClearGuestIdentityState();
         SaveAccountState();
-        await TrySyncCloudProfileAsync();
-        await SyncPresenceAndFriendsAsync();
-
         UsernameTextBox.Text = resolvedUsername;
         AddOrPromoteSavedUsername(resolvedUsername);
         ApplyAccountUiState();
         HideSidePanel();
         SetStatus($"Вход выполнен: {resolvedUsername}.");
+        _ = SyncCloudAccountAfterAuthenticationAsync();
+    }
+
+    private void ShowAccountNotice(string message, string title)
+    {
+        if (App.IsPhotinoBackendHost)
+        {
+            SetStatus($"{title}: {message}");
+            ApplyAccountUiState();
+            return;
+        }
+
+        MessageBox.Show(
+            this,
+            message,
+            title,
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+    }
+
+    private async Task SyncCloudAccountAfterAuthenticationAsync()
+    {
+        try
+        {
+            await TrySyncCloudProfileAsync();
+            await SyncPresenceAndFriendsAsync();
+            ApplyAccountUiState();
+        }
+        catch (Exception ex)
+        {
+            TryWriteErrorToLog(ex, "Ошибка фоновой синхронизации аккаунта после входа");
+        }
     }
 
     private async Task SubmitIncognitoAsync(string? usernameOverride = null)
@@ -4698,6 +4695,9 @@ public partial class MainWindow : Window
             var avatarBytes = ConvertImageFileToPngBytes(sourcePath, 256);
             var avatarFileName = SaveAvatarBytesToLocalProfile(_accountState!.Username, avatarBytes);
             UpdateAccountAvatarFileName(avatarFileName);
+            RefreshAccountSection();
+            RefreshFriendsProfileAvatarPreview();
+            ApplyAccountUiState();
 
             SetBusy(true, "Сохраняю аватар...");
             var uploadResult = await UploadAvatarToCloudAsync(avatarBytes);
@@ -4708,16 +4708,16 @@ public partial class MainWindow : Window
 
             if (!uploadResult.Success)
             {
-                MessageBox.Show(
-                    this,
+                ShowAccountNotice(
                     $"Аватар обновлен локально, но не сохранился в облаке.{Environment.NewLine}{Environment.NewLine}{uploadResult.ErrorMessage}",
-                    "Облако аватара",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    "Облако аватара");
                 SetStatus("Аватар обновлен локально.");
                 return;
             }
 
+            await TrySyncCloudProfileAsync(uploadLocalAvatarIfMissing: false);
+            await RefreshCloudFriendsAsync(showStatusOnSuccess: false);
+            ApplyAccountUiState();
             SetStatus("Аватар обновлен и сохранен в облаке.");
         }
         catch (Exception ex)
@@ -4956,11 +4956,6 @@ public partial class MainWindow : Window
 
     private void EnsureSharedSkinRegistryConfig()
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         var sourcePath = Path.Combine(AppContext.BaseDirectory, "skin-sync.json");
         if (!File.Exists(sourcePath))
         {
@@ -4993,11 +4988,6 @@ public partial class MainWindow : Window
 
     private void EnsureSharedAccountSyncConfig()
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         var sourcePath = Path.Combine(AppContext.BaseDirectory, "account-sync.json");
         if (!File.Exists(sourcePath))
         {
@@ -5180,6 +5170,11 @@ public partial class MainWindow : Window
 
     private async void VesperNetStatusTimer_OnTick(object? sender, EventArgs e)
     {
+        if (!PlatformService.Features.SupportsVesperNetService)
+        {
+            return;
+        }
+
         await RefreshVesperNetStatusAsync();
 
         if (_activeRelaySession is not null &&
@@ -6106,13 +6101,21 @@ public partial class MainWindow : Window
             ShowSidePanelSection(SidePanelSection.Account);
             SetStatus(HasRegisteredAccount()
                 ? "Сессия истекла. Войди снова."
-                : "Сначала войди, зарегистрируйся или выбери инкогнито.");
-            MessageBox.Show(
-                this,
-                "Перед запуском нужно войти, зарегистрироваться или включить инкогнито справа.",
-                "Нет аккаунта",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+                : "Сначала войди или зарегистрируйся.");
+
+            if (App.IsPhotinoBackendHost)
+            {
+                ApplyAccountUiState();
+            }
+            else
+            {
+                MessageBox.Show(
+                    this,
+                    "Перед запуском нужно войти или зарегистрироваться.",
+                    "Нет аккаунта",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
             return;
         }
 
@@ -6338,7 +6341,7 @@ public partial class MainWindow : Window
         AccountPasswordBox.IsEnabled = !isBusy && !hasAccount;
         LoginAccountButton.IsEnabled = !isBusy && !hasAccount;
         CreateAccountButton.IsEnabled = !isBusy && !hasAccount;
-        EnterIncognitoButton.IsEnabled = !isBusy && !hasAccount;
+        EnterIncognitoButton.IsEnabled = false;
         AccountAuthPrimaryButton.IsEnabled = !isBusy && !hasAccount;
         ChangeAvatarButton.IsEnabled = !isBusy && (hasAccount || hasGuestIdentity);
         LogoutAccountButton.IsEnabled = !isBusy && (hasAccount || hasGuestIdentity);
@@ -6580,12 +6583,7 @@ public partial class MainWindow : Window
         try
         {
             Directory.CreateDirectory(targetDirectory);
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = targetDirectory,
-                UseShellExecute = true
-            });
-            SetStatus($"Открыта папка: {targetDirectory}");
+            OpenFolderInExplorer(targetDirectory, $"Открыта папка: {targetDirectory}");
         }
         catch (Exception ex)
         {
@@ -7747,20 +7745,7 @@ public partial class MainWindow : Window
     private void OpenProfileFolderButton_OnClick(object sender, RoutedEventArgs e)
     {
         var profilePath = ResolveCurrentProfileDirectory();
-        try
-        {
-            Directory.CreateDirectory(profilePath);
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = profilePath,
-                UseShellExecute = true
-            });
-            SetStatus($"Открыта папка профиля: {profilePath}");
-        }
-        catch (Exception ex)
-        {
-            ShowError(ex, "Ошибка открытия папки");
-        }
+        OpenFolderInExplorer(profilePath, $"Открыта папка профиля: {profilePath}");
     }
 
     private void SkinButton_OnClick(object sender, RoutedEventArgs e)
@@ -12771,17 +12756,17 @@ public partial class MainWindow : Window
         return assetsDirectory;
     }
 
-    private void OpenFolderInExplorer(string folderPath, string successStatus)
+    private async void OpenFolderInExplorer(string folderPath, string successStatus)
     {
         try
         {
-            Directory.CreateDirectory(folderPath);
-            Process.Start(new ProcessStartInfo
+            if (await PlatformService.Processes.OpenFolderAsync(folderPath).ConfigureAwait(true))
             {
-                FileName = folderPath,
-                UseShellExecute = true
-            });
-            SetStatus(successStatus);
+                SetStatus(successStatus);
+                return;
+            }
+
+            SetStatus($"Не удалось открыть папку: {folderPath}");
         }
         catch (Exception ex)
         {

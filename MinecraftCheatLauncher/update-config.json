@@ -7,5 +7,6 @@
   "Channel": "win",
   "IncludePrerelease": false,
   "StartupDecisionTimeoutSeconds": 15,
+  "DownloadTimeoutSeconds": 600,
   "MaximumDeltasBeforeFallback": 3
 }

@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using MinecraftCheatLauncher.Core;
+using MinecraftCheatLauncher.Platform;
 
 namespace MinecraftCheatLauncher;
 
@@ -29,7 +30,11 @@ public partial class App : Application
             return;
         }
 
-        WindowsUninstallRegistration.EnsureRegistered(TryWriteInfoToLog, TryWriteErrorToLog);
+        var platformService = PlatformServiceFactory.CreateCurrent();
+        if (platformService.Features.SupportsWindowsInstaller)
+        {
+            WindowsUninstallRegistration.EnsureRegistered(TryWriteInfoToLog, TryWriteErrorToLog);
+        }
 
         ShowStartupUpdateWindow();
         await Dispatcher.Yield(DispatcherPriority.Render);

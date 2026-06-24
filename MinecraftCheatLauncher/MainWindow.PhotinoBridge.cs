@@ -12,6 +12,7 @@ using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 using MinecraftCheatLauncher.Launcher;
 using MinecraftCheatLauncher.PhotinoHost;
+using MinecraftCheatLauncher.PhotinoState;
 
 namespace MinecraftCheatLauncher;
 
@@ -36,6 +37,7 @@ public partial class MainWindow
     private bool _isApplyingPhotinoHostHiddenState;
     private string? _photinoSkinPreviewCacheKey;
     private string? _photinoSkinPreviewDataUrl;
+    private readonly LauncherStateProvider _launcherStateProvider = new();
 
     public void PrepareForPhotinoHost()
     {
@@ -112,23 +114,21 @@ public partial class MainWindow
     public object CreatePhotinoSnapshot()
     {
         var currentNickname = GetActiveNickname() ?? UsernameTextBox.Text?.Trim() ?? string.Empty;
-        return new
-        {
-            activeSection = _activeSidePanelSection.ToString().ToLowerInvariant(),
-            activeSettingsTab = _activeLauncherSettingsTabId,
-            isBusy = _isBusy,
-            isGameRunning = _gameProcess is not null && !_gameProcess.HasExited,
-            canAccessFriends = CanAccessFriendsFeature(),
-            notificationsCount = _incomingFriendRequests.Count,
-            theme = BuildPhotinoThemeSnapshot(),
-            main = BuildPhotinoMainSnapshot(currentNickname),
-            account = BuildPhotinoAccountSnapshot(currentNickname),
-            settings = BuildPhotinoSettingsSnapshot(),
-            skin = BuildPhotinoSkinSnapshot(),
-            background = BuildPhotinoBackgroundSnapshot(),
-            mods = BuildPhotinoModsSnapshot(),
-            friends = BuildPhotinoFriendsSnapshot(currentNickname)
-        };
+        return _launcherStateProvider.CreateSnapshot(new LauncherSnapshotParts(
+            ActiveSection: _activeSidePanelSection.ToString().ToLowerInvariant(),
+            ActiveSettingsTab: _activeLauncherSettingsTabId,
+            IsBusy: _isBusy,
+            IsGameRunning: _gameProcess is not null && !_gameProcess.HasExited,
+            CanAccessFriends: CanAccessFriendsFeature(),
+            NotificationsCount: _incomingFriendRequests.Count,
+            Theme: BuildPhotinoThemeSnapshot(),
+            Main: BuildPhotinoMainSnapshot(currentNickname),
+            Account: BuildPhotinoAccountSnapshot(currentNickname),
+            Settings: BuildPhotinoSettingsSnapshot(),
+            Skin: BuildPhotinoSkinSnapshot(),
+            Background: BuildPhotinoBackgroundSnapshot(),
+            Mods: BuildPhotinoModsSnapshot(),
+            Friends: BuildPhotinoFriendsSnapshot(currentNickname)));
     }
 
     public Task ExecutePhotinoCommandAsync(string command, JsonElement payload)
@@ -159,7 +159,7 @@ public partial class MainWindow
                 return Task.CompletedTask;
 
             case "main.launch":
-                LaunchButton_OnClick(LaunchButton, new RoutedEventArgs());
+                ExecuteLaunchCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "main.selectversionkey":
@@ -186,7 +186,7 @@ public partial class MainWindow
                 return Task.CompletedTask;
 
             case "main.openprofilefolder":
-                OpenProfileFolderButton_OnClick(OpenProfileFolderButton, new RoutedEventArgs());
+                OpenProfileFolderCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "account.setmode":
@@ -200,7 +200,7 @@ public partial class MainWindow
                 return LogoutPhotinoAccountAsync();
 
             case "account.pickavatar":
-                ChangeAvatarButton_OnClick(ChangeAvatarButton, new RoutedEventArgs());
+                PickAccountAvatarCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "account.selectrecentusername":
@@ -232,7 +232,7 @@ public partial class MainWindow
                 return Task.CompletedTask;
 
             case "settings.opengamedirectory":
-                LauncherOpenGameDirectoryButton_OnClick(LauncherOpenGameDirectoryButton, new RoutedEventArgs());
+                OpenLauncherGameDirectoryCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "skin.selectfile":
@@ -248,23 +248,23 @@ public partial class MainWindow
                 return Task.CompletedTask;
 
             case "skin.clear":
-                ClearSkinSelectionButton_OnClick(ClearSkinSelectionButton, new RoutedEventArgs());
+                ClearSkinSelectionCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "skin.importdialog":
-                ImportSkinButton_OnClick(ImportSkinButton, new RoutedEventArgs());
+                ImportSkinCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "skin.openfolder":
-                OpenSkinsFolderButton_OnClick(OpenSkinsFolderButton, new RoutedEventArgs());
+                OpenSkinsFolderCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "background.reset":
-                ApplyDefaultBackgroundButton_OnClick(ApplyDefaultBackgroundButton, new RoutedEventArgs());
+                ResetBackgroundCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "background.openfolder":
-                OpenBackgroundsFolderButton_OnClick(OpenBackgroundsFolderButton, new RoutedEventArgs());
+                OpenBackgroundsFolderCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "mods.selectcategory":
@@ -284,11 +284,11 @@ public partial class MainWindow
                 return RefreshRecommendedModCatalogAsync(forceRefresh: true);
 
             case "mods.installselected":
-                InstallSelectedModsButton_OnClick(InstallSelectedModsButton, new RoutedEventArgs());
+                InstallSelectedModsCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "mods.clearselection":
-                ClearSelectedModsButton_OnClick(ClearSelectedModsButton, new RoutedEventArgs());
+                ClearSelectedModsCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "mods.togglefavorite":
@@ -300,7 +300,7 @@ public partial class MainWindow
                 return Task.CompletedTask;
 
             case "mods.openfolder":
-                OpenModsFolderButton_OnClick(OpenModsFolderButton, new RoutedEventArgs());
+                OpenModsFolderCommandFromPhotino();
                 return Task.CompletedTask;
 
             case "friends.setnickname":
@@ -335,6 +335,14 @@ public partial class MainWindow
         var username = TryGetString(payload, "username");
         var password = TryGetString(payload, "password");
 
+        if (mode == AccountEntryMode.Guest)
+        {
+            ClearGuestIdentityState();
+            SetAccountEntryMode(AccountEntryMode.Login);
+            SetStatus("Гостевой режим отключен. Войди или зарегистрируйся.");
+            return;
+        }
+
         ApplyPhotinoAccountMode(mode.ToString().ToLowerInvariant());
         if (!string.IsNullOrWhiteSpace(username))
         {
@@ -359,7 +367,7 @@ public partial class MainWindow
                 : _savedUsernames.FirstOrDefault() ?? string.Empty;
             ShowSidePanelSection(SidePanelSection.Account);
             ApplyAccountUiState();
-            SetStatus("Инкогнито отключено.");
+            SetStatus("Гостевой режим отключен.");
             return;
         }
 
@@ -381,11 +389,13 @@ public partial class MainWindow
         var normalizedMode = requestedMode?.Trim().ToLowerInvariant();
         if (string.Equals(normalizedMode, "guest", StringComparison.Ordinal))
         {
-            _accountEntryMode = AccountEntryMode.Guest;
-            _isEditingIncognitoNickname = true;
+            ClearGuestIdentityState();
+            _accountEntryMode = AccountEntryMode.Login;
+            _isEditingIncognitoNickname = false;
             AccountPasswordBox.Password = string.Empty;
             RefreshAccountSection();
             FocusAccountNicknameEditorIfNeeded();
+            SetStatus("Гостевой режим отключен. Доступен вход или регистрация.");
             return;
         }
 
@@ -409,33 +419,7 @@ public partial class MainWindow
 
     private void ApplyPhotinoSettingsToggle(string? field, bool value)
     {
-        switch (field?.Trim().ToLowerInvariant())
-        {
-            case "usesystemjava":
-                UseSystemJavaToggleButton.IsChecked = value;
-                LauncherSettingsToggleButton_OnClick(UseSystemJavaToggleButton, new RoutedEventArgs());
-                break;
-            case "showjvmargs":
-                ShowJvmArgsToggleButton.IsChecked = value;
-                LauncherSettingsToggleButton_OnClick(ShowJvmArgsToggleButton, new RoutedEventArgs());
-                break;
-            case "autooptimizememory":
-                AutoOptimizeMemoryToggleButton.IsChecked = value;
-                LauncherSettingsToggleButton_OnClick(AutoOptimizeMemoryToggleButton, new RoutedEventArgs());
-                break;
-            case "autominimizeonlaunch":
-                AutoMinimizeLauncherToggleButton.IsChecked = value;
-                LauncherSettingsToggleButton_OnClick(AutoMinimizeLauncherToggleButton, new RoutedEventArgs());
-                break;
-            case "restorelauncheraftergameexit":
-                RestoreLauncherAfterGameExitToggleButton.IsChecked = value;
-                LauncherSettingsToggleButton_OnClick(RestoreLauncherAfterGameExitToggleButton, new RoutedEventArgs());
-                break;
-            case "clicksoundenabled":
-                LauncherClickSoundToggleButton.IsChecked = value;
-                LauncherSettingsToggleButton_OnClick(LauncherClickSoundToggleButton, new RoutedEventArgs());
-                break;
-        }
+        ApplyLauncherSettingsToggleCommandFromPhotino(field, value);
     }
 
     private void ApplyPhotinoSettingsText(string? field, string? value)
@@ -543,7 +527,7 @@ public partial class MainWindow
             return;
         }
 
-        ToggleFavoriteModButton_OnClick(new Button { Tag = item }, new RoutedEventArgs());
+        ToggleFavoriteModCommandFromPhotino(item);
     }
 
     private void TriggerPhotinoModPrimaryAction(string? projectId)
@@ -554,7 +538,7 @@ public partial class MainWindow
             return;
         }
 
-        InstallCatalogModButton_OnClick(new Button { Tag = item }, new RoutedEventArgs());
+        InstallCatalogModCommandFromPhotino(item);
     }
 
     private async Task RespondPhotinoFriendRequestAsync(JsonElement payload)
@@ -587,7 +571,7 @@ public partial class MainWindow
             return;
         }
 
-        ConnectToFriendButton_OnClick(new Button { Tag = friend }, new RoutedEventArgs());
+        ConnectToFriendCommandFromPhotino(friend);
     }
 
     private RecommendedModCatalogItem? FindPhotinoCatalogItem(string? projectId)
@@ -683,25 +667,25 @@ public partial class MainWindow
         var avatarPath = ResolveAccountAvatarPath(HasAuthenticatedCloudSession() ? _accountState : null);
         var avatarName = HasAuthenticatedCloudSession()
             ? _accountState?.Username
-            : HasIncognitoIdentity()
-                ? _guestIdentityState?.Username
-                : currentNickname;
+            : currentNickname;
 
         return new
         {
             mode = ResolvePhotinoAccountMode(),
             hasAuthenticatedSession = HasAuthenticatedCloudSession(),
             hasStoredProfile = HasRegisteredAccount(),
-            hasGuestIdentity = HasIncognitoIdentity(),
-            isEditingGuest = _isEditingIncognitoNickname,
-            accountStateText = AccountStateTextBlock.Text,
+            hasGuestIdentity = false,
+            isEditingGuest = false,
+            accountStateText = HasAuthenticatedCloudSession()
+                ? AccountStateTextBlock.Text
+                : "Сессия не активна. Войдите или зарегистрируйтесь.",
             nicknameInput = AccountNicknameTextBox.Text?.Trim() ?? string.Empty,
             currentNickname,
-            avatarUrl = ToLauncherFileUrl(avatarPath),
+            avatarUrl = ToLauncherAvatarUrl(avatarPath),
             avatarPlaceholder = BuildAvatarPlaceholderText(avatarName),
             canLogout = LogoutAccountButton.IsEnabled,
             canChangeAvatar = ChangeAvatarButton.IsEnabled,
-            canUseGuest = true,
+            canUseGuest = false,
             recentUsernames = _savedUsernames.Take(MaxAccountRecentUsernames).ToArray(),
             hasEarlyPlayersAchievement = HasEarlyPlayersAchievement()
         };
@@ -920,7 +904,7 @@ public partial class MainWindow
             profileType = FriendsProfileTypeTextBlock.Text,
             cloudStatus = FriendsCloudStatusTextBlock.Text,
             vesperNetStatus = VesperNetStatusTextBlock.Text,
-            profileAvatarUrl = ToLauncherFileUrl(profileAvatarPath),
+            profileAvatarUrl = ToLauncherAvatarUrl(profileAvatarPath),
             profileAvatarPlaceholder = BuildAvatarPlaceholderText(currentNickname),
             friendNicknameInput = FriendNicknameTextBox.Text?.Trim() ?? string.Empty,
             canManage = CanManageCloudFriends(),
@@ -956,7 +940,7 @@ public partial class MainWindow
 
     private string ResolvePhotinoAccountMode()
     {
-        if (HasAuthenticatedCloudSession() || (HasIncognitoIdentity() && !_isEditingIncognitoNickname))
+        if (HasAuthenticatedCloudSession())
         {
             return "summary";
         }
@@ -964,7 +948,6 @@ public partial class MainWindow
         return _accountEntryMode switch
         {
             AccountEntryMode.Register => "register",
-            AccountEntryMode.Guest => "guest",
             _ => "login"
         };
     }
@@ -988,7 +971,6 @@ public partial class MainWindow
         return mode?.Trim().ToLowerInvariant() switch
         {
             "register" => AccountEntryMode.Register,
-            "guest" => AccountEntryMode.Guest,
             _ => AccountEntryMode.Login
         };
     }
@@ -1179,7 +1161,25 @@ public partial class MainWindow
 
     private static string? ToLauncherAvatarUrl(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        if (Uri.TryCreate(path, UriKind.Absolute, out var uri))
+        {
+            if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == "data")
+            {
+                return uri.ToString();
+            }
+
+            if (uri.IsFile)
+            {
+                path = uri.LocalPath;
+            }
+        }
+
+        if (!File.Exists(path))
         {
             return null;
         }

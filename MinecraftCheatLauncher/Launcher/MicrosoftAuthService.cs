@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using MinecraftCheatLauncher.Platform;
 
 namespace MinecraftCheatLauncher.Launcher;
 
@@ -24,10 +25,7 @@ public sealed class MicrosoftAuthService
     private const string AzureTenantId = "consumers";
     private const string MsaScope = "XboxLive.signin offline_access";
 
-    private static readonly string CacheFilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "VesperLauncher",
-        "msa-token.json");
+    private static readonly string CacheFilePath = LauncherDataPaths.GetDataFilePath("msa-token.json");
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(5) };
 
@@ -294,16 +292,25 @@ public sealed class MicrosoftAuthService
 
     private static MsaTokenCache? TryLoadCache()
     {
-        try
+        foreach (var cachePath in LauncherDataPaths.GetDataFileCandidates("msa-token.json"))
         {
-            if (!File.Exists(CacheFilePath)) return null;
-            var json = File.ReadAllText(CacheFilePath);
-            return JsonSerializer.Deserialize<MsaTokenCache>(json);
+            try
+            {
+                if (!File.Exists(cachePath))
+                {
+                    continue;
+                }
+
+                var json = File.ReadAllText(cachePath);
+                return JsonSerializer.Deserialize<MsaTokenCache>(json);
+            }
+            catch
+            {
+                // Try the next compatibility path.
+            }
         }
-        catch
-        {
-            return null;
-        }
+
+        return null;
     }
 
     private static void SaveCache(MsaTokenCache cache)
@@ -318,7 +325,10 @@ public sealed class MicrosoftAuthService
 
     public static void ClearCache()
     {
-        try { File.Delete(CacheFilePath); } catch { /**/ }
+        foreach (var cachePath in LauncherDataPaths.GetDataFileCandidates("msa-token.json"))
+        {
+            try { File.Delete(cachePath); } catch { /**/ }
+        }
     }
 }
 

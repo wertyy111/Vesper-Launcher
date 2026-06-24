@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Photino.NET;
 using MinecraftCheatLauncher.Core;
 using MinecraftCheatLauncher.PhotinoHost;
+using MinecraftCheatLauncher.Platform;
 using Velopack;
 
 namespace MinecraftCheatLauncher;
@@ -35,11 +36,15 @@ internal static class Program
     };
 
     private static readonly Logger HostLogger = new("photino-shell");
+    private static readonly IPlatformService PlatformService = PlatformServiceFactory.CreateCurrent();
 
     [STAThread]
     private static void Main(string[] args)
     {
-        VelopackApp.Build().Run();
+        if (PlatformService.Features.SupportsVelopackAutoUpdate)
+        {
+            VelopackApp.Build().Run();
+        }
 
         AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
         {
@@ -50,20 +55,19 @@ internal static class Program
         };
         HostLogger.Info(AppDiagnostics.Capture().ToLogText());
 
-        using var backendHost = new LauncherWpfBackendHost();
+        using var backendHost = LauncherBackendHostFactory.CreateCurrent();
         using var shutdown = new CancellationTokenSource();
         var bridgeLock = new SemaphoreSlim(1, 1);
         var snapshotTransport = new SnapshotTransportState();
 
+        // Start backend updates check in background
         backendHost.Start();
-        if (!backendHost.WaitForLauncherReadyAsync().GetAwaiter().GetResult())
-        {
-            return;
-        }
 
+        // Start local static server immediately to allow background preloading
         using var staticServer = LocalStaticFileServer.Start();
 
-        var window = CreateWindow(staticServer.BaseUrl);
+        // Create the window offscreen initially to prevent flickering/raw UI loading view
+        var window = CreateWindow(staticServer.BaseUrl, startOffscreen: true);
         window.RegisterWebMessageReceivedHandler((sender, message) =>
         {
             if (sender is not PhotinoWindow photinoWindow)
@@ -79,9 +83,53 @@ internal static class Program
 
         try
         {
+            // Start preloading the HTML/JS offscreen
             window.Load(staticServer.BaseUrl);
-            snapshotLoop = RunSnapshotLoopAsync(window, backendHost, bridgeLock, snapshotTransport, shutdown.Token);
-            ScheduleLauncherWindowBounds(window, shutdown.Token);
+
+            // Run a background task to wait for updates and client readiness asynchronously,
+            // so we do not block the main STA thread which is needed for the message pump.
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    // 1. Wait for updates check (WPF splash) to finish
+                    var launcherReady = await backendHost.WaitForLauncherReadyAsync().ConfigureAwait(false);
+                    if (!launcherReady)
+                    {
+                        window.Invoke(() => window.Close());
+                        return;
+                    }
+
+                    // 2. Keep Photino offscreen while React preloads heavy UI work.
+                    // The frontend sends client.uiReady only after liquid glass has initialized.
+                    await WaitForLauncherUiReadyAsync(snapshotTransport, shutdown.Token).ConfigureAwait(false);
+
+                    // 3. Apply size/shape while still offscreen. Do not activate or move onscreen yet.
+                    window.Invoke(() =>
+                    {
+                        TryApplyLauncherWindowBounds(window, updatePosition: false);
+                    });
+
+                    // 4. The update window owns the screen until the launcher is fully preloaded.
+                    await backendHost.ExecuteCommandAsync("host.closeSplash", default).ConfigureAwait(false);
+
+                    // 5. Only after closing the splash do we place and activate the launcher window.
+                    await Task.Delay(80, shutdown.Token).ConfigureAwait(false);
+                    window.Invoke(() =>
+                    {
+                        TryApplyLauncherWindowBounds(window, updatePosition: true);
+                    });
+
+                    // 6. Start normal execution loops
+                    snapshotLoop = RunSnapshotLoopAsync(window, backendHost, bridgeLock, snapshotTransport, shutdown.Token);
+                    ScheduleLauncherWindowBounds(window, shutdown.Token);
+                }
+                catch (Exception ex)
+                {
+                    TryWriteLog($"[{DateTime.Now:O}] PRELOAD ERROR{Environment.NewLine}{ex}{Environment.NewLine}");
+                }
+            });
+
             window.WaitForClose();
         }
         finally
@@ -101,7 +149,24 @@ internal static class Program
         }
     }
 
-    private static PhotinoWindow CreateWindow(string startUrl)
+    private static async Task WaitForLauncherUiReadyAsync(
+        SnapshotTransportState snapshotTransport,
+        CancellationToken cancellationToken)
+    {
+        var timeoutAt = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(25);
+        while (!snapshotTransport.IsUiReady && !cancellationToken.IsCancellationRequested)
+        {
+            if (DateTimeOffset.UtcNow >= timeoutAt)
+            {
+                TryWriteLog($"[{DateTime.Now:O}] WARNING: UI preload timed out. Showing launcher after fallback delay.{Environment.NewLine}");
+                return;
+            }
+
+            await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static PhotinoWindow CreateWindow(string startUrl, bool startOffscreen)
     {
         var iconPath = ResolveIconPath();
         var window = new PhotinoWindow
@@ -111,7 +176,7 @@ internal static class Program
             Resizable = true,
             ContextMenuEnabled = false,
             DevToolsEnabled = false,
-            Centered = true,
+            Centered = !startOffscreen,
             UseOsDefaultLocation = false,
             UseOsDefaultSize = false,
             Width = LauncherWidth,
@@ -119,6 +184,12 @@ internal static class Program
             MinWidth = LauncherMinWidth,
             MinHeight = LauncherMinHeight
         };
+
+        if (startOffscreen)
+        {
+            window.Left = -32000;
+            window.Top = -32000;
+        }
 
         if (!string.IsNullOrWhiteSpace(iconPath))
         {
@@ -130,6 +201,11 @@ internal static class Program
 
     private static void ScheduleLauncherWindowBounds(PhotinoWindow window, CancellationToken cancellationToken)
     {
+        if (!PlatformService.Features.SupportsNativeWindowShaping)
+        {
+            return;
+        }
+
         _ = Task.Run(async () =>
         {
             for (var attempt = 0; attempt < 60 && !cancellationToken.IsCancellationRequested; attempt++)
@@ -145,6 +221,11 @@ internal static class Program
 
     private static bool TryApplyLauncherWindowBounds(PhotinoWindow window, bool updatePosition)
     {
+        if (!PlatformService.Features.SupportsNativeWindowShaping)
+        {
+            return false;
+        }
+
         var handle = FindPhotinoWindowHandle();
         if (handle == IntPtr.Zero)
         {
@@ -213,6 +294,11 @@ internal static class Program
 
     private static void ApplyRoundedWindowShape(IntPtr handle, int width, int height, double scale)
     {
+        if (!PlatformService.Features.SupportsNativeWindowShaping)
+        {
+            return;
+        }
+
         try
         {
             if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
@@ -259,6 +345,11 @@ internal static class Program
 
     private static double GetPrimaryMonitorScale(IntPtr windowHandle)
     {
+        if (!PlatformService.Features.SupportsNativeWindowShaping)
+        {
+            return 1d;
+        }
+
         var registryScale = TryReadAppliedDpiScale();
         if (registryScale is not null)
         {
@@ -285,6 +376,11 @@ internal static class Program
 
     private static double? TryReadAppliedDpiScale()
     {
+        if (!OperatingSystem.IsWindows() || !PlatformService.Features.SupportsNativeWindowShaping)
+        {
+            return null;
+        }
+
         try
         {
             using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop\WindowMetrics");
@@ -321,6 +417,11 @@ internal static class Program
 
     private static IntPtr FindPhotinoWindowHandle()
     {
+        if (!PlatformService.Features.SupportsNativeWindowShaping)
+        {
+            return IntPtr.Zero;
+        }
+
         var currentProcessId = (uint)Environment.ProcessId;
         var result = IntPtr.Zero;
         EnumWindows((handle, _) =>
@@ -347,6 +448,11 @@ internal static class Program
 
     private static void StartWindowDrag(PhotinoWindow window)
     {
+        if (!PlatformService.Features.SupportsNativeWindowShaping)
+        {
+            return;
+        }
+
         window.Invoke(() =>
         {
             var handle = window.WindowHandle;
@@ -363,7 +469,7 @@ internal static class Program
     private static async Task HandleIncomingMessageAsync(
         PhotinoWindow window,
         string rawMessage,
-        LauncherWpfBackendHost backendHost,
+        ILauncherBackendHost backendHost,
         SemaphoreSlim bridgeLock,
         SnapshotTransportState snapshotTransport,
         CancellationToken cancellationToken)
@@ -394,6 +500,10 @@ internal static class Program
                 {
                     case "host.requestsnapshot":
                     case "bridge.requestsnapshot":
+                        break;
+
+                    case "client.uiready":
+                        snapshotTransport.MarkUiReady();
                         break;
 
                     case "host.minimize":
@@ -448,7 +558,7 @@ internal static class Program
 
     private static async Task RunSnapshotLoopAsync(
         PhotinoWindow window,
-        LauncherWpfBackendHost backendHost,
+        ILauncherBackendHost backendHost,
         SemaphoreSlim bridgeLock,
         SnapshotTransportState snapshotTransport,
         CancellationToken cancellationToken)
@@ -467,7 +577,7 @@ internal static class Program
 
     private static async Task PublishSnapshotAsync(
         PhotinoWindow window,
-        LauncherWpfBackendHost backendHost,
+        ILauncherBackendHost backendHost,
         SemaphoreSlim bridgeLock,
         SnapshotTransportState snapshotTransport,
         CancellationToken cancellationToken,
@@ -513,7 +623,7 @@ internal static class Program
 
     private static async Task PublishSnapshotCoreAsync(
         PhotinoWindow window,
-        LauncherWpfBackendHost backendHost,
+        ILauncherBackendHost backendHost,
         SnapshotTransportState snapshotTransport,
         CancellationToken cancellationToken,
         bool forcePublish)
@@ -553,7 +663,7 @@ internal static class Program
 
     private static async Task TrySynchronizeBoundsAsync(
         PhotinoWindow window,
-        LauncherWpfBackendHost backendHost,
+        ILauncherBackendHost backendHost,
         SemaphoreSlim bridgeLock,
         CancellationToken cancellationToken)
     {
@@ -767,6 +877,7 @@ internal static class Program
     private sealed class SnapshotTransportState
     {
         private int _clientReady;
+        private int _uiReady;
 
         public string? LastSnapshotJson { get; set; }
 
@@ -775,6 +886,13 @@ internal static class Program
         public void MarkClientReady()
         {
             Volatile.Write(ref _clientReady, 1);
+        }
+
+        public bool IsUiReady => Volatile.Read(ref _uiReady) == 1;
+
+        public void MarkUiReady()
+        {
+            Volatile.Write(ref _uiReady, 1);
         }
     }
 }

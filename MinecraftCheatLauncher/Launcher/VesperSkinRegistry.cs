@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using MinecraftCheatLauncher.Platform;
 
 namespace MinecraftCheatLauncher.Launcher;
 
@@ -17,15 +18,8 @@ internal static class VesperSkinRegistry
     {
         PropertyNameCaseInsensitive = true
     };
-    private static readonly string RegistryDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "VesperLauncher");
-    private static readonly string RegistryPath = Path.Combine(
-        RegistryDirectory,
-        "skin-registry.json");
-    private static readonly string SyncConfigPath = Path.Combine(
-        RegistryDirectory,
-        "skin-sync.json");
+    private static readonly string RegistryPath = LauncherDataPaths.GetDataFilePath("skin-registry.json");
+    private static readonly string SyncConfigPath = LauncherDataPaths.GetDataFilePath("skin-sync.json");
 
     public static void SaveOrUpdate(
         string username,

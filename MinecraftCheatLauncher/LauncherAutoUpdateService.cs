@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using MinecraftCheatLauncher.Platform;
 using Velopack;
 using Velopack.Sources;
 
@@ -34,6 +35,12 @@ internal sealed class LauncherAutoUpdateService
 
     public async Task<bool> RunBeforeLaunchAsync()
     {
+        if (!PlatformServiceFactory.CreateCurrent().Features.SupportsVelopackAutoUpdate)
+        {
+            ReportReady("Автообновления лаунчера отключены для текущей платформы.");
+            return true;
+        }
+
         var config = LoadConfig();
         if (config is null || !config.Enabled || !config.CheckOnStartup)
         {
@@ -45,7 +52,7 @@ internal sealed class LauncherAutoUpdateService
         {
             ReportStatus("Проверяем обновления...", "Подключаемся к источнику Velopack...");
 
-            using var timeout = new CancellationTokenSource(BuildTimeout(config));
+            using var checkTimeout = new CancellationTokenSource(BuildStartupDecisionTimeout(config));
             var manager = CreateUpdateManager(config);
 
             if (!manager.IsInstalled)
@@ -60,7 +67,7 @@ internal sealed class LauncherAutoUpdateService
                 return ApplyPreparedUpdate(manager, pendingUpdate, config);
             }
 
-            var updateInfo = await manager.CheckForUpdatesAsync().WaitAsync(timeout.Token).ConfigureAwait(false);
+            var updateInfo = await manager.CheckForUpdatesAsync().WaitAsync(checkTimeout.Token).ConfigureAwait(false);
             if (updateInfo is null)
             {
                 ReportReady("Обновлений нет. Запускаем текущую версию.");
@@ -90,15 +97,25 @@ internal sealed class LauncherAutoUpdateService
                 false,
                 "0%");
 
-            await manager.DownloadUpdatesAsync(
-                updateInfo,
-                progress => ReportStatus(
-                    "Скачиваем обновление...",
-                    $"{Math.Clamp(progress, 0, 100)}%",
-                    progress,
-                    false,
-                    $"{Math.Clamp(progress, 0, 100)}%"),
-                timeout.Token).ConfigureAwait(false);
+            using var downloadTimeout = new CancellationTokenSource(BuildDownloadTimeout(config));
+            try
+            {
+                await manager.DownloadUpdatesAsync(
+                    updateInfo,
+                    progress => ReportStatus(
+                        "Скачиваем обновление...",
+                        $"{Math.Clamp(progress, 0, 100)}%",
+                        progress,
+                        false,
+                        $"{Math.Clamp(progress, 0, 100)}%"),
+                    downloadTimeout.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException ex) when (downloadTimeout.IsCancellationRequested)
+            {
+                _logError(ex, "Скачивание Velopack обновления превысило лимит времени");
+                ContinueWithCurrentVersion("Скачивание обновления заняло слишком много времени. Запускаем текущую версию.");
+                return true;
+            }
 
             return ApplyPreparedUpdate(manager, updateInfo.TargetFullRelease, config);
         }
@@ -132,6 +149,11 @@ internal sealed class LauncherAutoUpdateService
             "Установка...");
         _logInfo($"Applying Velopack update {update.Version}.");
         manager.ApplyUpdatesAndRestart(update);
+
+        // Velopack starts a helper process, but old launcher builds could keep the
+        // Photino/WPF host alive long enough to block replacing the current folder.
+        // Exiting here makes the update atomic: install helper owns the restart.
+        Environment.Exit(0);
         return false;
     }
 
@@ -203,11 +225,19 @@ internal sealed class LauncherAutoUpdateService
         });
     }
 
-    private static TimeSpan BuildTimeout(LauncherUpdateConfig config)
+    private static TimeSpan BuildStartupDecisionTimeout(LauncherUpdateConfig config)
     {
         var seconds = config.StartupDecisionTimeoutSeconds <= 0
             ? 15
             : config.StartupDecisionTimeoutSeconds;
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    private static TimeSpan BuildDownloadTimeout(LauncherUpdateConfig config)
+    {
+        var seconds = config.DownloadTimeoutSeconds <= 0
+            ? 600
+            : config.DownloadTimeoutSeconds;
         return TimeSpan.FromSeconds(seconds);
     }
 
@@ -288,6 +318,7 @@ internal sealed class LauncherAutoUpdateService
         public string Channel { get; init; } = "win";
         public bool IncludePrerelease { get; init; }
         public int StartupDecisionTimeoutSeconds { get; init; } = 15;
+        public int DownloadTimeoutSeconds { get; init; } = 600;
         public int MaximumDeltasBeforeFallback { get; init; } = 3;
     }
 }

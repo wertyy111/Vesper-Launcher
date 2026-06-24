@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Linq;
+using MinecraftCheatLauncher.Platform;
 
 namespace MinecraftCheatLauncher.Launcher;
 
@@ -1155,14 +1156,9 @@ internal sealed class VesperAuthHttpServer : IDisposable
     private static IReadOnlyList<string> TryLoadSkinSyncHosts()
     {
         var hosts = new List<string>();
-        var launcherDataDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VesperLauncher");
-        var candidatePaths = new[]
-        {
-            Path.Combine(launcherDataDirectory, "skin-sync.json"),
-            Path.Combine(AppContext.BaseDirectory, "skin-sync.json")
-        };
+        var candidatePaths = LauncherDataPaths.GetDataFileCandidates(
+            "skin-sync.json",
+            includeBaseDirectoryFile: true);
 
         foreach (var path in candidatePaths)
         {
@@ -1199,9 +1195,7 @@ internal sealed class VesperAuthHttpServer : IDisposable
 
     private static string GetLauncherDiagnosticDirectory()
     {
-        var baseDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VesperLauncher");
+        var baseDirectory = LauncherDataPaths.GetPreferredDataDirectory();
         Directory.CreateDirectory(baseDirectory);
         return baseDirectory;
     }
