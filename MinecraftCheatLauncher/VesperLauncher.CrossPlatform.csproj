@@ -80,7 +80,7 @@
   <Target Name="BuildPhotinoFrontend"
           BeforeTargets="AssignTargetPaths"
           Condition="Exists('$(FrontendRoot)\package.json') and '$(SkipFrontendBuild)' != 'true'">
-    <Exec WorkingDirectory="$(FrontendRoot)" Command="npm ci" Condition="!Exists('$(FrontendRoot)\node_modules')" />
+    <Exec WorkingDirectory="$(FrontendRoot)" Command="npm install" Condition="!Exists('$(FrontendRoot)\node_modules')" />
     <Exec WorkingDirectory="$(FrontendRoot)" Command="npm run build" />
   </Target>
 
