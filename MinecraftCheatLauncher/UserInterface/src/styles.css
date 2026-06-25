@@ -30,10 +30,11 @@
 
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; }
+#root { background: #05080b; border-radius: 14px; overflow: hidden; }
 body {
   margin: 0;
   overflow: hidden;
-  background: #05080b;
+  background: transparent;
   color: var(--text);
 }
 
@@ -2669,4 +2670,5 @@ img { display: block; max-width: 100%; }
   display: grid;
   place-items: center;
 }
+
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -67,7 +67,7 @@ internal static class Program
         using var staticServer = LocalStaticFileServer.Start();
 
         // Create the window offscreen initially to prevent flickering/raw UI loading view
-        var window = CreateWindow(staticServer.BaseUrl, startOffscreen: true);
+        var window = CreateWindow(staticServer.BaseUrl, startOffscreen: PlatformService.Features.SupportsNativeWindowShaping);
         window.RegisterWebMessageReceivedHandler((sender, message) =>
         {
             if (sender is not PhotinoWindow photinoWindow)
@@ -192,7 +192,8 @@ internal static class Program
             Width = LauncherWidth,
             Height = LauncherHeight,
             MinWidth = LauncherMinWidth,
-            MinHeight = LauncherMinHeight
+            MinHeight = LauncherMinHeight,
+            Transparent = true
         };
 
         if (startOffscreen)
@@ -906,6 +907,7 @@ internal static class Program
         }
     }
 }
+
 
 
 
