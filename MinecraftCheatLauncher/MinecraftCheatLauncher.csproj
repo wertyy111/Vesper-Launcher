@@ -3,9 +3,11 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(RuntimeIdentifier)' == 'osx-arm64' or '$(RuntimeIdentifier)' == 'osx-x64' or '$(RuntimeIdentifier)' == 'linux-x64'">net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
+    <UseWPF Condition="'$(TargetFramework)' == 'net10.0-windows'">true</UseWPF>
+    <UseWPF Condition="'$(TargetFramework)' != 'net10.0-windows'">false</UseWPF>
     <StartupObject>MinecraftCheatLauncher.Program</StartupObject>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\vesper-app.ico</ApplicationIcon>
@@ -34,11 +36,25 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BlurredBackground.WPF" Version="1.1.0" />
     <PackageReference Include="Open.NAT" Version="2.1.0" />
     <PackageReference Include="Photino.NET" Version="4.0.16" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="Velopack" Version="1.2.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <PackageReference Include="BlurredBackground.WPF" Version="1.1.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0-windows'">
+    <Compile Remove="**\*.xaml.cs" />
+    <Page Remove="**\*.xaml" />
+    <Compile Remove="PhotinoHost\LauncherWpfBackendHost.cs" />
+    <Compile Remove="WindowsUninstallRegistration.cs" />
+    <Compile Remove="MainWindow.*.cs" />
+    <Compile Remove="StartupUpdateWindow.cs" />
+    <Compile Remove="StartupUpdateWindow.*.cs" />
+    <Compile Remove="AssemblyInfo.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -70,7 +86,7 @@
     </Content>
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
     <Page Update="App.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
