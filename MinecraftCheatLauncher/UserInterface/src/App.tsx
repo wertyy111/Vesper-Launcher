@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+﻿import { startTransition, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { photinoBridge } from './bridge';
 import type { GlassTuningSettings, HostSnapshot, PanelRenderProps } from './types';
 
@@ -522,3 +522,4 @@ function renderPanel(props: PanelRenderProps) {
 }
 
 export default App;
+

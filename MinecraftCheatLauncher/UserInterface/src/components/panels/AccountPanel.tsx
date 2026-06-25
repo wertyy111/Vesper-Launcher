@@ -1,4 +1,4 @@
-import { photinoBridge } from '../../bridge';
+﻿import { photinoBridge } from '../../bridge';
 import type { PanelRenderProps } from '../../types';
 import { AvatarImage } from '../common/AvatarImage';
 import { PanelHeader } from '../common/PanelHeader';
@@ -143,3 +143,4 @@ export function AccountPanel({ launcher, accountForm, setAccountForm, setAccount
     </>
   );
 }
+
