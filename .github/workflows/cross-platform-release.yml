@@ -72,7 +72,7 @@ jobs:
         run: |
           dotnet tool restore
           dotnet tool run vpk -- download github --repoUrl https://github.com/wertyy111/Updates-Vesper --channel linux-x64 || true
-          dotnet tool run vpk -- pack -v "1.0.57-beta.1" -p "./_build_verify/cross-platform-publish/linux-x64" -c linux-x64 -e VesperLauncher --packId Vesper.Launcher -o "./_build_verify/release-artifacts"
+          dotnet tool run vpk -- pack -v "1.0.57-beta.1" -p "./_build_verify/cross-platform-publish/linux-x64" -c linux-x64 -e VesperLauncher --packId Vesper.Launcher -i "MinecraftCheatLauncher/Assets/vesper-logo.png" -o "./_build_verify/release-artifacts"
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
@@ -165,6 +165,10 @@ jobs:
             -BuildFrontend `
             -RuntimeIdentifiers ${{ matrix.rid }}
 
+      - name: Generate macOS ICNS icon
+        shell: bash
+        run: npx png2icons MinecraftCheatLauncher/Assets/vesper-logo.png MinecraftCheatLauncher/Assets/vesper-app -icns
+
       - name: Build Velopack macOS
         env:
           MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
@@ -172,7 +176,7 @@ jobs:
         run: |
           dotnet tool restore
           dotnet tool run vpk -- download github --repoUrl https://github.com/wertyy111/Updates-Vesper --channel ${{ matrix.rid }} || true
-          dotnet tool run vpk -- pack -v "1.0.57-beta.1" -p "./_build_verify/cross-platform-publish/${{ matrix.rid }}" -c ${{ matrix.rid }} -e VesperLauncher --packId Vesper.Launcher -o "./_build_verify/release-artifacts"
+          dotnet tool run vpk -- pack -v "1.0.57-beta.1" -p "./_build_verify/cross-platform-publish/${{ matrix.rid }}" -c ${{ matrix.rid }} -e VesperLauncher --packId Vesper.Launcher -i "MinecraftCheatLauncher/Assets/vesper-app.icns" -o "./_build_verify/release-artifacts"
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
