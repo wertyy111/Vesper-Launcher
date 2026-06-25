@@ -208,6 +208,7 @@ internal sealed class LocalStaticFileServer : IDisposable
         var buffer = Encoding.UTF8.GetBytes(responseBody);
 
         context.Response.StatusCode = (int)HttpStatusCode.OK;
+        ApplyCommonResponseHeaders(context.Response);
         context.Response.ContentType = "application/json; charset=utf-8";
         context.Response.ContentLength64 = buffer.LongLength;
         await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
@@ -308,12 +309,14 @@ internal sealed class LocalStaticFileServer : IDisposable
         if (string.IsNullOrWhiteSpace(absolutePath) || !File.Exists(absolutePath))
         {
             context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+            ApplyCommonResponseHeaders(context.Response);
             context.Response.Close();
             return;
         }
 
         var extension = Path.GetExtension(absolutePath);
         context.Response.StatusCode = (int)HttpStatusCode.OK;
+        ApplyCommonResponseHeaders(context.Response);
         context.Response.ContentType = ContentTypes.TryGetValue(extension, out var contentType)
             ? contentType
             : "application/octet-stream";
@@ -322,5 +325,13 @@ internal sealed class LocalStaticFileServer : IDisposable
         context.Response.ContentLength64 = stream.Length;
         await stream.CopyToAsync(context.Response.OutputStream, 81920, cancellationToken).ConfigureAwait(false);
         context.Response.Close();
+    }
+
+    private static void ApplyCommonResponseHeaders(HttpListenerResponse response)
+    {
+        response.Headers["Access-Control-Allow-Origin"] = "*";
+        response.Headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+        response.Headers["Access-Control-Allow-Headers"] = "Content-Type";
+        response.Headers["Cache-Control"] = "no-store";
     }
 }

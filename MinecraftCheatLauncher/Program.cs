@@ -195,7 +195,7 @@ internal static class Program
             Height = LauncherHeight,
             MinWidth = LauncherMinWidth,
             MinHeight = LauncherMinHeight,
-            Transparent = false
+            Transparent = !OperatingSystem.IsWindows()
         };
 
         if (startOffscreen)

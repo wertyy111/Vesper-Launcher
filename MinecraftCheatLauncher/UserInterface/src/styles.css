@@ -37,6 +37,11 @@ body {
   color: var(--text);
 }
 
+html.platform-macos body,
+html.platform-linux body {
+  background: transparent;
+}
+
 body > canvas[data-liquid-ignore] {
   z-index: 40 !important;
 }
@@ -64,9 +69,15 @@ img { display: block; max-width: 100%; }
   position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
   background-position: center;
   background-size: cover;
   color: var(--text);
+}
+
+html.platform-macos .app-shell,
+html.platform-linux .app-shell {
+  border-radius: 14px;
 }
 
 .procedural-background,

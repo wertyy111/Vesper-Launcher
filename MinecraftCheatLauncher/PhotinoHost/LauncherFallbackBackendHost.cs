@@ -22,14 +22,14 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
     private string _javaPath = string.Empty;
     private string _extraJvmArgs = string.Empty;
     private string _modsSearch = string.Empty;
-    private string _modsCategory = "РњРѕРґС‹";
+    private string _modsCategory = "Моды";
 
     public LauncherFallbackBackendHost(IPlatformService platform)
     {
         _platform = platform;
         _accountFriends = new AccountFriendsService(platform);
-        _statusText = $"{platform.DisplayName}: Р±Р°Р·РѕРІС‹Р№ cross-platform СЂРµР¶РёРј.";
-        _progressText = "WPF РѕС‚РєР»СЋС‡С‘РЅ. РџРµСЂРµРЅРѕСЃ Р·Р°РїСѓСЃРєР° Minecraft Р±СѓРґРµС‚ СЃР»РµРґСѓСЋС‰РёРј С€Р°РіРѕРј.";
+        _statusText = $"{platform.DisplayName}: базовый cross-platform режим.";
+        _progressText = "WPF отключён. Перенос запуска Minecraft будет следующим шагом.";
     }
 
     public void Start()
@@ -55,7 +55,7 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
                     detailMessage = _progressText,
                     progressPercent = 0,
                     isIndeterminate = false,
-                    progressText = "Р“РѕС‚РѕРІРѕ"
+                    progressText = "Готово"
                 },
                 launcher = BuildLauncherSnapshot()
             });
@@ -120,16 +120,16 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
         {
             nickname,
             usernameText = nickname,
-            launchButtonText = "РЈСЃС‚Р°РЅРѕРІРёС‚СЊ",
+            launchButtonText = "Установить",
             statusText = _statusText,
             progressText = _progressText,
-            progressOverlayText = "Р“РѕС‚РѕРІРѕ",
+            progressOverlayText = "Готово",
             progressPercent = 0,
             isProgressIndeterminate = false,
             selectedVersionKey = _selectedVersionKey,
             selectedVersionId = "1.21",
-            selectedVersionLabel = "1.21 - Р±Р°Р·РѕРІР°СЏ",
-            inlineVersionLabel = "1.21 - Р±Р°Р·РѕРІР°СЏ",
+            selectedVersionLabel = "1.21 - базовая",
+            inlineVersionLabel = "1.21 - базовая",
             quickVersionHint = "Cross-platform shell",
             canLaunch = true,
             canOpenProfileFolder = true,
@@ -142,14 +142,14 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
                 new
                 {
                     key = "vanilla-1.21",
-                    displayName = "1.21 - Р±Р°Р·РѕРІР°СЏ",
+                    displayName = "1.21 - базовая",
                     baseVersionId = "1.21",
                     versionId = "1.21",
-                    availabilityNote = "Р”РѕСЃС‚СѓРїРЅРѕ РїРѕСЃР»Рµ РїРµСЂРµРЅРѕСЃР° VersionManager.",
+                    availabilityNote = "Доступно после переноса VersionManager.",
                     isSelected = _selectedVersionKey == "vanilla-1.21",
                     isInstalled = false,
                     installState = "NotInstalled",
-                    actionText = "РЈСЃС‚Р°РЅРѕРІРёС‚СЊ",
+                    actionText = "Установить",
                     loaders = Array.Empty<string>(),
                     subtitle = "Vanilla"
                 }
@@ -169,12 +169,12 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
             activeTab = _activeSettingsTab,
             tabs = new[]
             {
-                new { id = "launcher", label = "Р›Р°СѓРЅС‡РµСЂ" },
+                new { id = "launcher", label = "Лаунчер" },
                 new { id = "java", label = "Java" },
                 new { id = "vesper", label = "Vesper" },
-                new { id = "launch", label = "Р—Р°РїСѓСЃРє" },
-                new { id = "language", label = "РЇР·С‹Рє" },
-                new { id = "glass", label = "РЎС‚РµРєР»Рѕ" }
+                new { id = "launch", label = "Запуск" },
+                new { id = "language", label = "Язык" },
+                new { id = "glass", label = "Стекло" }
             },
             useSystemJava = _useSystemJava,
             javaPath = _javaPath,
@@ -193,32 +193,32 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
             loginFormPlacementId = "center",
             launcherDirectoryViewId = "current",
             javaRuntimeMode = _useSystemJava ? "system" : "custom",
-            javaModeHint = _useSystemJava ? "Р‘СѓРґРµС‚ РёСЃРїРѕР»СЊР·РѕРІР°РЅР° Java РёР· PATH." : "Р‘СѓРґРµС‚ РёСЃРїРѕР»СЊР·РѕРІР°РЅ СѓРєР°Р·Р°РЅРЅС‹Р№ РїСѓС‚СЊ.",
-            jvmArgsHint = _showJvmArgs ? "РџРѕР»Рµ РІРєР»СЋС‡РµРЅРѕ." : "РџРѕР»Рµ РІС‹РєР»СЋС‡РµРЅРѕ.",
-            autoMemoryHint = _autoMemory ? "РџР°РјСЏС‚СЊ РїРѕРґР±РёСЂР°РµС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё." : "Р СѓС‡РЅР°СЏ РїР°РјСЏС‚СЊ РІРєР»СЋС‡РµРЅР°.",
-            autoMinimizeHint = "Р”РѕСЃС‚СѓРїРЅРѕ РїРѕСЃР»Рµ РїРµСЂРµРЅРѕСЃР° MinecraftLauncher.",
-            restoreHint = "Р”РѕСЃС‚СѓРїРЅРѕ РїРѕСЃР»Рµ РїРµСЂРµРЅРѕСЃР° ProcessMonitor.",
+            javaModeHint = _useSystemJava ? "Будет использована Java из PATH." : "Будет использован указанный путь.",
+            jvmArgsHint = _showJvmArgs ? "Поле включено." : "Поле выключено.",
+            autoMemoryHint = _autoMemory ? "Память подбирается автоматически." : "Ручная память включена.",
+            autoMinimizeHint = "Доступно после переноса MinecraftLauncher.",
+            restoreHint = "Доступно после переноса ProcessMonitor.",
             displayedGameDirectory = _platform.Paths.MinecraftDirectory,
             languageOptions = new[]
             {
-                new { id = "auto", label = "РђРІС‚Рѕ" },
-                new { id = "ru_ru", label = "Р СѓСЃСЃРєРёР№" },
+                new { id = "auto", label = "Авто" },
+                new { id = "ru_ru", label = "Русский" },
                 new { id = "en_us", label = "English" }
             },
             loginPlacementOptions = new[]
             {
-                new { id = "center", label = "Р¦РµРЅС‚СЂ" },
-                new { id = "left", label = "РЎР»РµРІР°" }
+                new { id = "center", label = "Центр" },
+                new { id = "left", label = "Слева" }
             },
             directoryViewOptions = new[]
             {
-                new { id = "current", label = "РўРµРєСѓС‰Р°СЏ" },
+                new { id = "current", label = "Текущая" },
                 new { id = "minecraft", label = ".minecraft" }
             },
             javaRuntimeOptions = new[]
             {
-                new { id = "system", label = "РЎРёСЃС‚РµРјРЅР°СЏ Java" },
-                new { id = "custom", label = "РЎРІРѕР№ РїСѓС‚СЊ" }
+                new { id = "system", label = "Системная Java" },
+                new { id = "custom", label = "Свой путь" }
             },
             memoryPresets = new[] { 4096, 6144, 8192 }
         };
@@ -231,14 +231,14 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
             selectedSkinFileName = string.Empty,
             selectedSkinUrl = string.Empty,
             selectedSkinPreviewUrl = string.Empty,
-            selectedSkinLabel = "РЎРєРёРЅ РЅРµ РІС‹Р±СЂР°РЅ.",
+            selectedSkinLabel = "Скин не выбран.",
             selectedSkinIsSlim = false,
             modelPreferenceId = "auto",
             skinsDirectory = _platform.Paths.GetSkinsCacheDirectory(),
             availableSkins = Array.Empty<object>(),
             modelOptions = new[]
             {
-                new { id = "auto", label = "РђРІС‚Рѕ", isSelected = true },
+                new { id = "auto", label = "Авто", isSelected = true },
                 new { id = "classic", label = "Classic", isSelected = false },
                 new { id = "slim", label = "Slim", isSelected = false }
             }
@@ -250,7 +250,7 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
         return new
         {
             currentPresetId = "default",
-            currentPresetLabel = "РЎС‚Р°РЅРґР°СЂС‚РЅС‹Р№",
+            currentPresetLabel = "Стандартный",
             appliedBackgroundUrl = string.Empty,
             backgroundsDirectory = Path.Combine(ResolveAssetsRoot(), "Backgrounds"),
             items = Array.Empty<object>()
@@ -261,12 +261,12 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
     {
         return new
         {
-            summary = "РљР°С‚Р°Р»РѕРі РјРѕРґРѕРІ Р±СѓРґРµС‚ РїРµСЂРµРЅРµСЃС‘РЅ РїРѕСЃР»Рµ MinecraftLauncher.",
-            catalogSummary = "Cross-platform shell Р°РєС‚РёРІРµРЅ.",
+            summary = "Каталог модов будет перенесён после MinecraftLauncher.",
+            catalogSummary = "Cross-platform shell активен.",
             targetFolderHint = Path.Combine(_platform.Paths.MinecraftDirectory, "mods"),
             searchQuery = _modsSearch,
             selectedCategory = _modsCategory,
-            categories = new[] { "РњРѕРґС‹", "РЁРµР№РґРµСЂС‹", "Р РµСЃСѓСЂСЃРїР°РєРё", "РЎР±РѕСЂРєРё" },
+            categories = new[] { "Моды", "Шейдеры", "Ресурспаки", "Сборки" },
             isRefreshing = false,
             isCatalogLoading = false,
             canInstallSelected = false,
@@ -309,7 +309,7 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
             case "settings.setmemory":
                 _memoryMb = Math.Clamp(GetInt(payload, "value", _memoryMb), 1024, 12288);
                 _autoMemory = false;
-                _statusText = $"РџР°РјСЏС‚СЊ: {_memoryMb} MB.";
+                _statusText = $"Память: {_memoryMb} MB.";
                 return;
             case "settings.settoggle":
                 ApplyToggle(GetString(payload, "field", string.Empty), GetBool(payload, "value", false));
@@ -351,11 +351,11 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
                 _modsCategory = GetString(payload, "category", _modsCategory);
                 return;
             case "main.launch":
-                _statusText = "Р—Р°РїСѓСЃРє Minecraft РµС‰С‘ РїРµСЂРµРЅРѕСЃРёС‚СЃСЏ РІ cross-platform backend.";
-                _progressText = "РЎР»РµРґСѓСЋС‰РёР№ СЌС‚Р°Рї: JavaDetector, VersionManager Рё MinecraftLauncher Р±РµР· WPF.";
+                _statusText = "Запуск Minecraft ещё переносится в cross-platform backend.";
+                _progressText = "Следующий этап: JavaDetector, VersionManager и MinecraftLauncher без WPF.";
                 return;
             default:
-                _statusText = "РљРѕРјР°РЅРґР° РїРѕРєР° РЅРµ РїРµСЂРµРЅРµСЃРµРЅР°: " + command;
+                _statusText = "Команда пока не перенесена: " + command;
                 return;
         }
     }
