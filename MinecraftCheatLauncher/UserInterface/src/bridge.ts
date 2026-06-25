@@ -37,7 +37,7 @@ class PhotinoBridge {
   sendCommand(command: string, payload: Record<string, unknown> = {}) {
     this.ensureInitialized();
     const message = JSON.stringify({ type: 'command', command, payload });
-    window.external?.sendMessage?.(message);
+    void this.sendMessageToHost(message);
   }
 
   private ensureInitialized() {
@@ -46,30 +46,58 @@ class PhotinoBridge {
     }
 
     this.initialized = true;
-    const handleRawMessage = (raw: unknown) => {
-      const envelope = this.parseEnvelope(raw);
-      if (!envelope) {
-        return;
-      }
-
-      this.listeners.forEach((listener) => listener(envelope));
-    };
-
     const existingReceive = window.external?.receiveMessage;
     if (window.external) {
       window.external.receiveMessage = (message: string) => {
         existingReceive?.(message);
-        handleRawMessage(message);
+        this.dispatchRawMessage(message);
       };
     }
 
-    window.photinoReceiveMessage = handleRawMessage;
-    window.addEventListener('message', (event) => handleRawMessage(event.data));
+    window.photinoReceiveMessage = (message) => this.dispatchRawMessage(message);
+    window.addEventListener('message', (event) => this.dispatchRawMessage(event.data));
     document.addEventListener('message', ((event: Event) => {
       const customEvent = event as CustomEvent<unknown>;
-      handleRawMessage(customEvent.detail);
+      this.dispatchRawMessage(customEvent.detail);
     }) as EventListener);
-    window.chrome?.webview?.addEventListener?.('message', (event) => handleRawMessage(event.data));
+    window.chrome?.webview?.addEventListener?.('message', (event) => this.dispatchRawMessage(event.data));
+  }
+
+  private async sendMessageToHost(message: string) {
+    if (await this.trySendHttpBridgeMessage(message)) {
+      return;
+    }
+
+    window.external?.sendMessage?.(message);
+  }
+
+  private async trySendHttpBridgeMessage(message: string) {
+    try {
+      const response = await fetch('/bridge-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: message
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const text = await response.text();
+      this.dispatchRawMessage(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private dispatchRawMessage(raw: unknown) {
+    const envelope = this.parseEnvelope(raw);
+    if (!envelope) {
+      return;
+    }
+
+    this.listeners.forEach((listener) => listener(envelope));
   }
 
   private parseEnvelope(raw: unknown): HostEnvelope | null {

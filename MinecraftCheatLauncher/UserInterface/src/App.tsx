@@ -1,5 +1,6 @@
 ﻿import { startTransition, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { photinoBridge } from './bridge';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { GlassTuningSettings, HostSnapshot, PanelRenderProps } from './types';
 
 import { AccountPanel } from './components/panels/AccountPanel';
@@ -91,6 +92,18 @@ function App() {
         setRuntimeError(message.message ?? 'Не удалось обработать команду shell.');
       }
     });
+  }, []);
+
+  useEffect(() => {
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const platformClass = userAgent.includes('mac os') || userAgent.includes('macintosh')
+      ? 'platform-macos'
+      : userAgent.includes('linux')
+        ? 'platform-linux'
+        : 'platform-windows';
+
+    document.documentElement.classList.add(platformClass);
+    return () => document.documentElement.classList.remove(platformClass);
   }, []);
 
   useEffect(() => {
@@ -306,6 +319,17 @@ function App() {
     photinoBridge.sendCommand('shell.openSection', { section: sectionId });
   };
 
+  const stopButtonPointer = (event: ReactPointerEvent<HTMLElement>) => {
+    event.stopPropagation();
+  };
+
+  const runButtonAction = (event: ReactPointerEvent<HTMLElement>, action: () => void) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    action();
+  };
+
   const startWindowDrag = (event: MouseEvent<HTMLElement>) => {
     if (event.button !== 0 || event.detail > 1) return;
     if ((event.target as HTMLElement).closest('button, input, select, textarea, a')) return;
@@ -364,15 +388,15 @@ function App() {
           </div>
 
           <div className="titlebar-actions">
-            <button className="title-icon-button notifications-button" onClick={() => openSection('friends')} type="button" title="Приглашения в друзья">
+            <button className="title-icon-button notifications-button" onPointerDown={stopButtonPointer} onPointerUp={(event) => runButtonAction(event, () => openSection('friends'))} onClick={(event) => event.preventDefault()} type="button" title="Приглашения в друзья">
               <span className="mdl-icon">&#xE7F4;</span>
               {launcher?.notificationsCount ? <strong className="notification-badge">{launcher.notificationsCount}</strong> : null}
             </button>
-            <button className="title-account-button" onClick={() => openSection('account')} type="button">
+            <button className="title-account-button" onPointerDown={stopButtonPointer} onPointerUp={(event) => runButtonAction(event, () => openSection('account'))} onClick={(event) => event.preventDefault()} type="button">
               {account.currentNickname || main.nickname || 'Создайте аккаунт'}
             </button>
-            <button className="title-icon-button" onClick={() => photinoBridge.sendCommand('host.minimize')} type="button">−</button>
-            <button className="title-icon-button" onClick={() => photinoBridge.sendCommand('host.close')} type="button">✕</button>
+            <button className="title-icon-button" onPointerDown={stopButtonPointer} onPointerUp={(event) => runButtonAction(event, () => photinoBridge.sendCommand('host.minimize'))} onClick={(event) => event.preventDefault()} type="button">−</button>
+            <button className="title-icon-button" onPointerDown={stopButtonPointer} onPointerUp={(event) => runButtonAction(event, () => photinoBridge.sendCommand('host.close'))} onClick={(event) => event.preventDefault()} type="button">✕</button>
           </div>
         </header>
 
@@ -388,11 +412,11 @@ function App() {
                     <div className="classic-field-block">
                       <label className="classic-label">Игрок</label>
                       <div className="classic-inline-row">
-                        <button className="static-glass-control text-left left-liquid-glass-button" data-liquid-label={account.currentNickname || main.nickname || main.usernameText || 'Создайте аккаунт'} onClick={() => openSection('account')} type="button">
+                        <button className="static-glass-control text-left left-liquid-glass-button" data-liquid-label={account.currentNickname || main.nickname || main.usernameText || 'Создайте аккаунт'} onPointerDown={stopButtonPointer} onPointerUp={(event) => runButtonAction(event, () => openSection('account'))} onClick={(event) => event.preventDefault()} type="button">
                           <span className="left-liquid-glass-layer liquid-glass-layer" aria-hidden="true" />
                           <span className="left-liquid-glass-content">{account.currentNickname || main.nickname || main.usernameText || 'Создайте аккаунт'}</span>
                         </button>
-                        <button className="input-icon-button left-liquid-glass-button" data-liquid-icon={'\uE77B'} onClick={() => openSection('account')} type="button" title="Меню игрока">
+                        <button className="input-icon-button left-liquid-glass-button" data-liquid-icon={'\uE77B'} onPointerDown={stopButtonPointer} onPointerUp={(event) => runButtonAction(event, () => openSection('account'))} onClick={(event) => event.preventDefault()} type="button" title="Меню игрока">
                           <span className="left-liquid-glass-layer liquid-glass-layer" aria-hidden="true" />
                           <span className="mdl-icon left-liquid-glass-content">&#xE77B;</span>
                         </button>
@@ -409,7 +433,9 @@ function App() {
                             type="button"
                             aria-haspopup="listbox"
                             aria-expanded={versionMenuOpen}
-                            onClick={() => setVersionMenuOpen((open) => !open)}
+                            onPointerDown={stopButtonPointer}
+                            onPointerUp={(event) => runButtonAction(event, () => setVersionMenuOpen((open) => !open))}
+                            onClick={(event) => event.preventDefault()}
                           >
                             <span className="left-liquid-glass-layer liquid-glass-layer" aria-hidden="true" />
                             <span className="version-picker-label left-liquid-glass-content">{selectedVersionLabel}</span>
@@ -430,10 +456,12 @@ function App() {
                                     type="button"
                                     role="option"
                                     aria-selected={isSelected}
-                                    onClick={() => {
+                                    onPointerDown={stopButtonPointer}
+                                    onPointerUp={(event) => runButtonAction(event, () => {
                                       setVersionMenuOpen(false);
                                       photinoBridge.sendCommand('main.selectVersionKey', { key });
-                                    }}
+                                    })}
+                                    onClick={(event) => event.preventDefault()}
                                   >
                                     <span>{entry.displayName}</span>
                                   </button>
@@ -452,19 +480,19 @@ function App() {
                           </select>
                           <span className="select-chevron">&#xE70D;</span>
                         </div>
-                        <button className="input-icon-button left-liquid-glass-button" data-liquid-icon={'\uE8B7'} onClick={() => photinoBridge.sendCommand('main.openProfileFolder')} type="button" title="Папка профиля">
+                        <button className="input-icon-button left-liquid-glass-button" data-liquid-icon={'\uE8B7'} onPointerDown={stopButtonPointer} onPointerUp={(event) => runButtonAction(event, () => photinoBridge.sendCommand('main.openProfileFolder'))} onClick={(event) => event.preventDefault()} type="button" title="Папка профиля">
                           <span className="left-liquid-glass-layer liquid-glass-layer" aria-hidden="true" />
                           <span className="mdl-icon left-liquid-glass-content">&#xE8B7;</span>
                         </button>
                       </div>
 
                       <div className="classic-inline-row launch-row-classic">
-                        <button className="main-glass-button launch-button-classic left-liquid-glass-button" data-liquid-label={main.launchButtonText || 'Играть'} onClick={() => photinoBridge.sendCommand('main.launch')} type="button">
+                        <button className="main-glass-button launch-button-classic left-liquid-glass-button" data-liquid-label={main.launchButtonText || 'Играть'} onPointerDown={stopButtonPointer} onPointerUp={(event) => runButtonAction(event, () => photinoBridge.sendCommand('main.launch'))} onClick={(event) => event.preventDefault()} type="button">
                           <span className="left-liquid-glass-layer liquid-glass-layer" aria-hidden="true" />
                           <span className="launch-button-progress" style={{ width: `${progressPercent}%` }} />
                           <span className="left-liquid-glass-content">{main.launchButtonText || 'Играть'}</span>
                         </button>
-                        <button ref={settingsLiquidButtonRef} className="input-icon-button settings-liquid-button left-liquid-glass-button" data-liquid-ignore="" data-liquid-icon={'\uE713'} onClick={() => openSection('settings')} type="button" title="Настройки">
+                        <button ref={settingsLiquidButtonRef} className="input-icon-button settings-liquid-button left-liquid-glass-button" data-liquid-ignore="" data-liquid-icon={'\uE713'} onPointerDown={stopButtonPointer} onPointerUp={(event) => runButtonAction(event, () => openSection('settings'))} onClick={(event) => event.preventDefault()} type="button" title="Настройки">
                           <span className="settings-liquid-glass-test left-liquid-glass-layer liquid-glass-layer" aria-hidden="true" />
                           <span className="mdl-icon settings-liquid-button-icon left-liquid-glass-content">&#xE713;</span>
                         </button>
@@ -494,7 +522,9 @@ function App() {
                     key={section.id}
                     className={`main-glass-button ${launcher?.activeSection === section.id ? 'active' : ''} left-liquid-glass-button`}
                     data-liquid-label={section.label}
-                    onClick={() => openSection(section.id)}
+                    onPointerDown={stopButtonPointer}
+                    onPointerUp={(event) => runButtonAction(event, () => openSection(section.id))}
+                    onClick={(event) => event.preventDefault()}
                     type="button"
                   >
                     <span className="left-liquid-glass-layer liquid-glass-layer" aria-hidden="true" />

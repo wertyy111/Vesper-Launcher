@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   color-scheme: dark;
   --window-bg: #0a1118;
   --window-border: transparent;
@@ -186,10 +186,6 @@ img { display: block; max-width: 100%; }
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #f7fbff;
-  font-size: 14px;
-  line-height: 1;
-  box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
@@ -534,7 +530,7 @@ img { display: block; max-width: 100%; }
   overflow: visible;
   outline: 0;
   border-color: transparent !important;
-  background: transparent !important;
+  background: rgba(0, 0, 0, 0.01) !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -545,7 +541,7 @@ img { display: block; max-width: 100%; }
 .left-liquid-glass-button:focus-visible,
 .version-picker.open .left-liquid-glass-button {
   border-color: transparent !important;
-  background: transparent !important;
+  background: rgba(0, 0, 0, 0.01) !important;
   box-shadow: none !important;
 }
 
@@ -558,7 +554,7 @@ img { display: block; max-width: 100%; }
   border-radius: inherit;
   border: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.004)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
     rgba(9, 18, 25, 0.08) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
@@ -747,7 +743,7 @@ img { display: block; max-width: 100%; }
 .version-picker-option:focus-visible {
   outline: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent),
     rgba(255, 255, 255, 0.075);
   color: #ffffff;
 }
@@ -1008,7 +1004,7 @@ img { display: block; max-width: 100%; }
 .bottom-action-bar .main-glass-button.left-liquid-glass-button.active,
 .bottom-action-bar .main-glass-button.left-liquid-glass-button.active:hover {
   border-color: transparent !important;
-  background: transparent !important;
+  background: rgba(0, 0, 0, 0.01) !important;
   box-shadow: none !important;
   color: var(--text);
 }
@@ -2668,11 +2664,4 @@ img { display: block; max-width: 100%; }
   height: 42px;
   display: grid;
   place-items: center;
-}
-
-
-
-/* OVERRIDE FOR BROKEN BUTTONS */
-.main-glass-button, .left-liquid-glass-content, .left-liquid-glass-button, .account-segmented-toggle button {
-    pointer-events: auto !important;
 }

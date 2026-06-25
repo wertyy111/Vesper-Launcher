@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -68,6 +68,8 @@ internal static class Program
 
         // Create the window offscreen initially to prevent flickering/raw UI loading view
         var window = CreateWindow(staticServer.BaseUrl, startOffscreen: PlatformService.Features.SupportsNativeWindowShaping);
+        staticServer.BridgeMessageHandler = rawMessage =>
+            HandleHttpBridgeMessageAsync(window, rawMessage, backendHost, bridgeLock, snapshotTransport, shutdown.Token);
         window.RegisterWebMessageReceivedHandler((sender, message) =>
         {
             if (sender is not PhotinoWindow photinoWindow)
@@ -193,7 +195,7 @@ internal static class Program
             Height = LauncherHeight,
             MinWidth = LauncherMinWidth,
             MinHeight = LauncherMinHeight,
-            Transparent = true
+            Transparent = false
         };
 
         if (startOffscreen)
@@ -361,10 +363,17 @@ internal static class Program
             return 1d;
         }
 
-        var registryScale = TryReadAppliedDpiScale();
-        if (registryScale is not null)
+        try
         {
-            return registryScale.Value;
+            var windowScale = GetWindowDpiScale(windowHandle);
+            if (windowScale >= 1d)
+            {
+                return windowScale;
+            }
+        }
+        catch
+        {
+            // Fall through
         }
 
         try
@@ -382,7 +391,13 @@ internal static class Program
             // Fall through to the DPI fallback below.
         }
 
-        return GetWindowDpiScale(windowHandle);
+        var registryScale = TryReadAppliedDpiScale();
+        if (registryScale is not null)
+        {
+            return registryScale.Value;
+        }
+
+        return 1d;
     }
 
     private static double? TryReadAppliedDpiScale()
@@ -518,21 +533,21 @@ internal static class Program
                         break;
 
                     case "host.minimize":
-                        window.Minimized = true;
+                        window.Invoke(() => window.Minimized = true);
                         break;
 
                     case "host.togglemaximize":
-                        window.Maximized = !window.Maximized;
+                        window.Invoke(() => window.Maximized = !window.Maximized);
                         break;
 
                     case "host.startdrag":
                         shouldPublishSnapshot = false;
-                        StartWindowDrag(window);
+                        window.Invoke(() => StartWindowDrag(window));
                         break;
 
                     case "host.close":
                         shouldPublishSnapshot = false;
-                        window.Close();
+                        window.Invoke(() => window.Close());
                         break;
 
                     default:
@@ -564,6 +579,83 @@ internal static class Program
                 type = "error",
                 message = ex.Message
             }, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task<string> HandleHttpBridgeMessageAsync(
+        PhotinoWindow window,
+        string rawMessage,
+        ILauncherBackendHost backendHost,
+        SemaphoreSlim bridgeLock,
+        SnapshotTransportState snapshotTransport,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(rawMessage);
+            var root = document.RootElement;
+            var command = root.TryGetProperty("command", out var commandElement) && commandElement.ValueKind == JsonValueKind.String
+                ? commandElement.GetString()
+                : root.TryGetProperty("type", out var typeElement) && typeElement.ValueKind == JsonValueKind.String
+                    ? typeElement.GetString()
+                    : null;
+            var payload = root.TryGetProperty("payload", out var payloadElement)
+                ? payloadElement.Clone()
+                : default;
+
+            snapshotTransport.MarkClientReady();
+            if (!string.IsNullOrWhiteSpace(command))
+            {
+                await bridgeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    switch (command.Trim().ToLowerInvariant())
+                    {
+                        case "host.requestsnapshot":
+                        case "bridge.requestsnapshot":
+                            break;
+
+                        case "client.uiready":
+                            snapshotTransport.MarkUiReady();
+                            break;
+
+                        case "host.minimize":
+                            window.Invoke(() => window.Minimized = true);
+                            break;
+
+                        case "host.togglemaximize":
+                            window.Invoke(() => window.Maximized = !window.Maximized);
+                            break;
+
+                        case "host.startdrag":
+                            StartWindowDrag(window);
+                            break;
+
+                        case "host.close":
+                            window.Invoke(() => window.Close());
+                            break;
+
+                        default:
+                            await backendHost.ExecuteCommandAsync(command, payload).ConfigureAwait(false);
+                            break;
+                    }
+                }
+                finally
+                {
+                    bridgeLock.Release();
+                }
+            }
+
+            return await BuildSnapshotEnvelopeJsonAsync(backendHost).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            TryWriteLog($"[{DateTime.Now:O}] HTTP BRIDGE ERROR{Environment.NewLine}{ex}{Environment.NewLine}");
+            return JsonSerializer.Serialize(new
+            {
+                type = "error",
+                message = ex.Message
+            }, JsonOptions);
         }
     }
 
@@ -644,12 +736,7 @@ internal static class Program
             return;
         }
 
-        var snapshot = await backendHost.GetSnapshotAsync().ConfigureAwait(false);
-        var json = JsonSerializer.Serialize(new
-        {
-            type = "snapshot",
-            data = snapshot
-        }, JsonOptions);
+        var json = await BuildSnapshotEnvelopeJsonAsync(backendHost).ConfigureAwait(false);
 
         if (!forcePublish && string.Equals(snapshotTransport.LastSnapshotJson, json, StringComparison.Ordinal))
         {
@@ -660,6 +747,16 @@ internal static class Program
         {
             snapshotTransport.LastSnapshotJson = json;
         }
+    }
+
+    private static async Task<string> BuildSnapshotEnvelopeJsonAsync(ILauncherBackendHost backendHost)
+    {
+        var snapshot = await backendHost.GetSnapshotAsync().ConfigureAwait(false);
+        return JsonSerializer.Serialize(new
+        {
+            type = "snapshot",
+            data = snapshot
+        }, JsonOptions);
     }
 
     private static async Task WaitForClientReadyAsync(

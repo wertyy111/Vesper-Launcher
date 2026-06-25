@@ -52,6 +52,8 @@ internal sealed class LocalStaticFileServer : IDisposable
 
     public string BaseUrl { get; }
 
+    public Func<string, Task<string>>? BridgeMessageHandler { get; set; }
+
     public static LocalStaticFileServer Start()
     {
         var frontendRoot = ResolveFrontendRoot();
@@ -136,6 +138,13 @@ internal sealed class LocalStaticFileServer : IDisposable
         try
         {
             var requestPath = Uri.UnescapeDataString(context.Request.Url?.AbsolutePath ?? "/");
+            if (requestPath.Equals("/bridge-message", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(context.Request.HttpMethod, "POST", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleBridgeMessageAsync(context, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
             if (requestPath.StartsWith("/launcher-assets/", StringComparison.OrdinalIgnoreCase))
             {
                 var assetRelativePath = requestPath["/launcher-assets/".Length..];
@@ -181,6 +190,28 @@ internal sealed class LocalStaticFileServer : IDisposable
             await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
             context.Response.Close();
         }
+    }
+
+    private async Task HandleBridgeMessageAsync(HttpListenerContext context, CancellationToken cancellationToken)
+    {
+        var handler = BridgeMessageHandler;
+        if (handler is null)
+        {
+            context.Response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+            context.Response.Close();
+            return;
+        }
+
+        using var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding ?? Encoding.UTF8);
+        var requestBody = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+        var responseBody = await handler(requestBody).ConfigureAwait(false);
+        var buffer = Encoding.UTF8.GetBytes(responseBody);
+
+        context.Response.StatusCode = (int)HttpStatusCode.OK;
+        context.Response.ContentType = "application/json; charset=utf-8";
+        context.Response.ContentLength64 = buffer.LongLength;
+        await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
+        context.Response.Close();
     }
 
     private static string ResolveFrontendRoot()
