@@ -106,7 +106,7 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
             iconUrl = ToLauncherFileUrl(FindFirstExisting(assetsRoot, "vesper-app.ico")),
             logoUrl = ToLauncherFileUrl(FindFirstExisting(assetsRoot, "vesper-logo.png", "V.png", "vesper-app.png")),
             wordmarkUrl = ToLauncherFileUrl(FindFirstExisting(assetsRoot, "vesper-launcher-wordmark.png", "vesper-logo.png")),
-            backgroundUrl = ToLauncherFileUrl(FindFirstExisting(assetsRoot, "фон дня.png", "vesper-menu-art.jpg", "background.png")),
+            backgroundUrl = ToLauncherFileUrl(FindFirstExisting(assetsRoot, "bg-day.png", "фон дня.png", "vesper-menu-art.jpg", "background.png")),
             glassTone = "light"
         };
     }
@@ -459,4 +459,5 @@ internal sealed class LauncherFallbackBackendHost : ILauncherBackendHost
             : fallback;
     }
 }
+
 
