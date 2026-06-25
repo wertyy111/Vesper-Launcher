@@ -315,7 +315,7 @@ internal sealed class LauncherAutoUpdateService
         public bool InstallOnStartup { get; init; } = true;
         public string SourceType { get; init; } = "GitHub";
         public string? SourceUrl { get; init; }
-        public string Channel { get; init; } = "win";
+        public string Channel { get; init; } = string.Empty;
         public bool IncludePrerelease { get; init; }
         public int StartupDecisionTimeoutSeconds { get; init; } = 15;
         public int DownloadTimeoutSeconds { get; init; } = 600;

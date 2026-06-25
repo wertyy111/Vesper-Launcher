@@ -67,20 +67,21 @@ jobs:
             -BuildFrontend `
             -RuntimeIdentifiers linux-x64
 
-      - name: Build AppImage
+      - name: Build Velopack Linux
         shell: bash
         run: |
-          chmod +x ./scripts/package-linux-appimage.sh
-          ./scripts/package-linux-appimage.sh \
-            "./_build_verify/cross-platform-publish/linux-x64" \
-            "./_build_verify/release-artifacts" \
-            "${VESPER_VERSION}"
+          dotnet tool restore
+          dotnet tool run vpk -- download github --repoUrl https://github.com/wertyy111/Updates-Vesper --channel linux-x64 || true
+          dotnet tool run vpk -- pack -u Vesper.Launcher -v "${VESPER_VERSION}" -p "./_build_verify/cross-platform-publish/linux-x64" -c linux-x64 -e VesperLauncher --packId Vesper.Launcher -o "./_build_verify/release-artifacts"
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
           name: vesper-linux-appimage
-          path: "_build_verify/release-artifacts/*.AppImage"
+          path: |
+            _build_verify/release-artifacts/*.AppImage
+            _build_verify/release-artifacts/*.nupkg
+            _build_verify/release-artifacts/releases.*.json
           if-no-files-found: error
 
   macos-dmg:
@@ -164,23 +165,24 @@ jobs:
             -BuildFrontend `
             -RuntimeIdentifiers ${{ matrix.rid }}
 
-      - name: Build DMG
+      - name: Build Velopack macOS
         env:
           MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
         shell: bash
         run: |
-          chmod +x ./scripts/package-macos-dmg.sh
-          ./scripts/package-macos-dmg.sh \
-            "./_build_verify/cross-platform-publish/${{ matrix.rid }}" \
-            "${{ matrix.rid }}" \
-            "./_build_verify/release-artifacts" \
-            "${VESPER_VERSION}"
+          dotnet tool restore
+          dotnet tool run vpk -- download github --repoUrl https://github.com/wertyy111/Updates-Vesper --channel ${{ matrix.rid }} || true
+          dotnet tool run vpk -- pack -u Vesper.Launcher -v "${VESPER_VERSION}" -p "./_build_verify/cross-platform-publish/${{ matrix.rid }}" -c ${{ matrix.rid }} -e VesperLauncher --packId Vesper.Launcher -o "./_build_verify/release-artifacts"
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: vesper-${{ matrix.rid }}-dmg
-          path: "_build_verify/release-artifacts/*.dmg"
+          path: |
+            _build_verify/release-artifacts/*.pkg
+            _build_verify/release-artifacts/*.zip
+            _build_verify/release-artifacts/*.nupkg
+            _build_verify/release-artifacts/releases.*.json
           if-no-files-found: error
 
   upload-release:
@@ -205,7 +207,12 @@ jobs:
           name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
             dist/*.AppImage
-            dist/*.dmg
+            dist/*.pkg
+            dist/*.zip
+            dist/*.nupkg
+            dist/releases.*.json
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
