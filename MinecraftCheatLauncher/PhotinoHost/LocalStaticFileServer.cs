@@ -205,7 +205,8 @@ internal sealed class LocalStaticFileServer : IDisposable
         var candidates = new[]
         {
             Path.Combine(AppContext.BaseDirectory, "Assets"),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Assets"))
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Assets")),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Resources", "Assets"))
         };
 
         var resolved = candidates.FirstOrDefault(Directory.Exists);
