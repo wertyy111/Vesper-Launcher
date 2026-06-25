@@ -107,6 +107,11 @@ internal static class Program
                     // 3. Apply size/shape while still offscreen. Do not activate or move onscreen yet.
                     window.Invoke(() =>
                     {
+                        if (!PlatformService.Features.SupportsNativeWindowShaping)
+                        {
+                            window.Center();
+                            return;
+                        }
                         TryApplyLauncherWindowBounds(window, updatePosition: false);
                     });
 
@@ -117,6 +122,11 @@ internal static class Program
                     await Task.Delay(80, shutdown.Token).ConfigureAwait(false);
                     window.Invoke(() =>
                     {
+                        if (!PlatformService.Features.SupportsNativeWindowShaping)
+                        {
+                            window.Center();
+                            return;
+                        }
                         TryApplyLauncherWindowBounds(window, updatePosition: true);
                     });
 
