@@ -72,7 +72,7 @@ jobs:
         run: |
           dotnet tool restore
           dotnet tool run vpk -- download github --repoUrl https://github.com/wertyy111/Updates-Vesper --channel linux-x64 || true
-          dotnet tool run vpk -- pack -u Vesper.Launcher -v "${VESPER_VERSION}" -p "./_build_verify/cross-platform-publish/linux-x64" -c linux-x64 -e VesperLauncher --packId Vesper.Launcher -o "./_build_verify/release-artifacts"
+          dotnet tool run vpk -- pack -v "1.0.57-beta.1" -p "./_build_verify/cross-platform-publish/linux-x64" -c linux-x64 -e VesperLauncher --packId Vesper.Launcher -o "./_build_verify/release-artifacts"
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
@@ -172,7 +172,7 @@ jobs:
         run: |
           dotnet tool restore
           dotnet tool run vpk -- download github --repoUrl https://github.com/wertyy111/Updates-Vesper --channel ${{ matrix.rid }} || true
-          dotnet tool run vpk -- pack -u Vesper.Launcher -v "${VESPER_VERSION}" -p "./_build_verify/cross-platform-publish/${{ matrix.rid }}" -c ${{ matrix.rid }} -e VesperLauncher --packId Vesper.Launcher -o "./_build_verify/release-artifacts"
+          dotnet tool run vpk -- pack -v "1.0.57-beta.1" -p "./_build_verify/cross-platform-publish/${{ matrix.rid }}" -c ${{ matrix.rid }} -e VesperLauncher --packId Vesper.Launcher -o "./_build_verify/release-artifacts"
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
@@ -214,5 +214,6 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
