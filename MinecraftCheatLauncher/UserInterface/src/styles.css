@@ -29,8 +29,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body, #root { width: 100%; height: 100%; background: transparent !important; }
-
+html, body, #root { width: 100%; height: 100%; }
 body {
   margin: 0;
   overflow: hidden;
@@ -555,7 +554,6 @@ img { display: block; max-width: 100%; }
 .settings-liquid-glass-test {
   position: absolute !important;
   inset: 0;
-  pointer-events: none !important;
   z-index: 0 !important;
   border-radius: inherit;
   border: 0;
@@ -2671,8 +2669,4 @@ img { display: block; max-width: 100%; }
   display: grid;
   place-items: center;
 }
-
-
-
-
 
