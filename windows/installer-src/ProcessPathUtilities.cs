@@ -7,7 +7,7 @@ internal static class ProcessPathUtilities
 {
 	public static string? TryGetLaunchedExecutablePath()
 	{
-		foreach (string candidate in GetCandidates())
+		foreach (string? candidate in GetCandidates())
 		{
 			if (string.IsNullOrWhiteSpace(candidate))
 			{
@@ -35,7 +35,7 @@ internal static class ProcessPathUtilities
 		{
 			yield return commandLineArgs[0];
 		}
-		string text;
+		string? text;
 		try
 		{
 			text = Process.GetCurrentProcess().MainModule?.FileName;

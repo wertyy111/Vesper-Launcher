@@ -1,223 +1,608 @@
 name: Cross-platform release
 
 on:
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
-      tag:
-        description: "GitHub release tag to upload assets into"
-        required: true
-        default: "beta-1.0"
       version:
-        description: "Artifact version label"
+        description: "Semantic version without the v prefix"
         required: true
-        default: "beta-1.0"
+        default: "1.0.60-beta.1"
+      tag:
+        description: "Release tag"
+        required: true
+        default: "v1.0.60-beta.1"
       upload_release:
-        description: "Upload AppImage/DMG assets to the GitHub Release"
+        description: "Upload the verified assets to GitHub Releases"
         required: true
-        default: "true"
-        type: choice
-        options:
-          - "true"
-          - "false"
+        default: true
+        type: boolean
   push:
     tags:
-      - "beta-*"
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: cross-platform-release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  VESPER_VERSION: ${{ github.event.inputs.version || github.ref_name }}
+  VESPER_VERSION: ${{ inputs.version || (github.event_name == 'pull_request' && '1.0.60-beta.1') || github.ref_name }}
+  VESPER_TAG: ${{ inputs.tag || (github.event_name == 'pull_request' && 'v1.0.60-beta.1') || github.ref_name }}
+  RELEASE_REPOSITORY: wertyy111/Updates-Vesper
 
 jobs:
-  linux-appimage:
-    name: Linux AppImage
+  security:
+    name: Source secret guard
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - name: Reject embedded credentials
+        shell: bash
+        run: |
+          pat_class='[A-Za-z0-9_]'
+          legacy_pattern="$(printf 'gh%s_' p)[A-Za-z0-9]{20,}"
+          fine_grained_pattern="$(printf 'github_%s_' pat)${pat_class}{20,}"
+          private_key_pattern="$(printf '%s%s' '-----BEGIN ' '(RSA |EC |OPENSSH )?PRIVATE KEY-----')"
+          cloudflare_pattern="$(printf 'cf%s_' at)[A-Za-z0-9_-]{20,}"
+          encoded_bearer_pattern="Bearer[[:space:]]+B64:[A-Za-z0-9+/=]{20,}"
+          if git grep -nE "$legacy_pattern|$fine_grained_pattern|$private_key_pattern|$cloudflare_pattern|$encoded_bearer_pattern" -- .; then
+            echo 'Embedded credential material is forbidden.' >&2
+            exit 1
+          fi
+
+  linux:
+    name: Linux x64
+    needs: security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
         with:
           dotnet-version: "10.0.x"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
-          cache: "npm"
-          cache-dependency-path: "MinecraftCheatLauncher/UserInterface/package-lock.json"
+          cache: npm
+          cache-dependency-path: VesperLauncherApp/UserInterface/package-lock.json
 
-      - name: Install AppImage build dependencies
+      - name: Normalize and validate version
+        shell: bash
+        run: |
+          version="${VESPER_VERSION#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid semantic version: $VESPER_VERSION" >&2
+            exit 1
+          fi
+          echo "VESPER_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Install AppImage dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libfuse2 desktop-file-utils
 
-      - name: Publish Linux shell
+      - name: Publish launcher
         shell: pwsh
         run: |
           ./scripts/Publish-CrossPlatformShell.ps1 `
             -Configuration Release `
+            -Version $env:VESPER_VERSION `
             -SelfContained `
             -BuildFrontend `
             -RuntimeIdentifiers linux-x64
 
-      - name: Build Velopack Linux
+      - name: Run native Linux self-test
+        shell: bash
+        run: |
+          chmod +x _build_verify/cross-platform-publish/linux-x64/VesperLauncher
+          _build_verify/cross-platform-publish/linux-x64/VesperLauncher --self-test --expect-rid linux-x64
+
+      - name: Pack AppImage and update package
         shell: bash
         run: |
           dotnet tool restore
-          dotnet tool run vpk -- download github --repoUrl https://github.com/wertyy111/Updates-Vesper --channel linux-x64 || true
-          dotnet tool run vpk -- pack -v "${VESPER_VERSION}" -p "./_build_verify/cross-platform-publish/linux-x64" -c linux-x64 -e VesperLauncher --packId Vesper.Launcher -i "MinecraftCheatLauncher/Assets/vesper-logo.png" -o "./_build_verify/release-artifacts"
+          mkdir -p _release/linux
+          dotnet tool run vpk -- pack \
+            --packId Vesper.Launcher \
+            --packVersion "$VESPER_VERSION" \
+            --packDir _build_verify/cross-platform-publish/linux-x64 \
+            --mainExe VesperLauncher \
+            --outputDir _release/linux \
+            --channel linux-x64 \
+            --runtime linux-x64 \
+            --packTitle "Vesper Launcher" \
+            --packAuthors "Vesper Launcher" \
+            --icon VesperLauncherApp/Assets/vesper-logo.png
 
-      - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
+          appimage="$(find _release/linux -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
+          test -n "$appimage"
+          cp "$appimage" _release/linux/VesperLauncher-linux-x64.AppImage
+          chmod +x _release/linux/VesperLauncher-linux-x64.AppImage
+
+      - name: Build DEB package
+        shell: bash
+        run: |
+          deb_version="$(printf '%s' "$VESPER_VERSION" | sed 's/-/~/g')"
+          root="_release/deb/vesper-launcher_${deb_version}_amd64"
+          install -d "$root/DEBIAN" "$root/opt/vesper-launcher" \
+            "$root/usr/share/applications" "$root/usr/share/icons/hicolor/512x512/apps"
+          cp -a _build_verify/cross-platform-publish/linux-x64/. "$root/opt/vesper-launcher/"
+          chmod 755 "$root/opt/vesper-launcher/VesperLauncher"
+          cat > "$root/DEBIAN/control" <<EOF
+          Package: vesper-launcher
+          Version: $deb_version
+          Architecture: amd64
+          Maintainer: Vesper Launcher <support@vesper-app.site>
+          Depends: libwebkit2gtk-4.1-0 | libwebkit2gtk-4.0-37
+          Description: Vesper Launcher for Minecraft
+          EOF
+          cat > "$root/usr/share/applications/vesper-launcher.desktop" <<EOF
+          [Desktop Entry]
+          Name=Vesper Launcher
+          Exec=/opt/vesper-launcher/VesperLauncher
+          Icon=vesper-launcher
+          Type=Application
+          Categories=Game;
+          Terminal=false
+          EOF
+          install -m 644 VesperLauncherApp/Assets/vesper-logo.png \
+            "$root/usr/share/icons/hicolor/512x512/apps/vesper-launcher.png"
+          dpkg-deb --root-owner-group --build "$root" _release/linux/VesperLauncher-linux-x64.deb
+
+      - name: Verify Linux assets
+        shell: bash
+        run: |
+          test -s _release/linux/VesperLauncher-linux-x64.AppImage
+          test -x _release/linux/VesperLauncher-linux-x64.AppImage
+          test -s _release/linux/VesperLauncher-linux-x64.deb
+          dpkg-deb --info _release/linux/VesperLauncher-linux-x64.deb >/dev/null
+          rm -rf _release/appimage-test
+          mkdir -p _release/appimage-test
+          (
+            cd _release/appimage-test
+            ../linux/VesperLauncher-linux-x64.AppImage --appimage-extract >/dev/null
+            ./squashfs-root/AppRun --self-test --expect-rid linux-x64
+          )
+          sudo apt-get install -y ./_release/linux/VesperLauncher-linux-x64.deb
+          /opt/vesper-launcher/VesperLauncher --self-test --expect-rid linux-x64
+          sudo apt-get remove -y vesper-launcher
+          find _release/linux -maxdepth 1 -type f -printf '%f %s bytes\n'
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: vesper-linux-appimage
-          path: |
-            _build_verify/release-artifacts/*.AppImage
-            _build_verify/release-artifacts/*.nupkg
-            _build_verify/release-artifacts/releases.*.json
+          name: vesper-linux-x64
+          path: _release/linux/*
           if-no-files-found: error
+          compression-level: 0
 
-  macos-dmg:
-    name: macOS DMG (${{ matrix.rid }})
-    runs-on: macos-latest
+  macos:
+    name: macOS ${{ matrix.rid }}
+    needs: security
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        rid:
-          - osx-x64
-          - osx-arm64
-
+        include:
+          - rid: osx-x64
+            runner: macos-15-intel
+          - rid: osx-arm64
+            runner: macos-15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
         with:
           dotnet-version: "10.0.x"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
-          cache: "npm"
-          cache-dependency-path: "MinecraftCheatLauncher/UserInterface/package-lock.json"
+          cache: npm
+          cache-dependency-path: VesperLauncherApp/UserInterface/package-lock.json
 
-      - name: Import Apple Developer ID certificate
-        env:
-          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
-          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+      - name: Normalize and validate version
         shell: bash
         run: |
-          if [[ -z "${MACOS_CERTIFICATE_P12_BASE64}" || -z "${MACOS_CERTIFICATE_PASSWORD}" || -z "${MACOS_CODESIGN_IDENTITY}" ]]; then
-            echo "Apple signing secrets are not configured; building unsigned DMG."
-            exit 0
+          version="${VESPER_VERSION#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid semantic version: $VESPER_VERSION" >&2
+            exit 1
           fi
+          echo "VESPER_VERSION=$version" >> "$GITHUB_ENV"
+          echo "MACOS_BUNDLE_VERSION=${version%%[-+]*}" >> "$GITHUB_ENV"
 
-          keychain_password="${MACOS_KEYCHAIN_PASSWORD:-vesper-build-keychain}"
-          certificate_path="$RUNNER_TEMP/developer-id.p12"
-          keychain_path="$RUNNER_TEMP/vesper-signing.keychain-db"
-
-          echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$certificate_path"
-          security create-keychain -p "$keychain_password" "$keychain_path"
-          security set-keychain-settings -lut 21600 "$keychain_path"
-          security unlock-keychain -p "$keychain_password" "$keychain_path"
-          security import "$certificate_path" -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
-          security list-keychain -d user -s "$keychain_path" "$HOME/Library/Keychains/login.keychain-db"
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain_path"
-
-      - name: Prepare App Store Connect API key
+      - name: Require macOS signing and notarization for public releases
         env:
-          MACOS_NOTARY_KEY_BASE64: ${{ secrets.MACOS_NOTARY_KEY_BASE64 }}
-          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
-          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          SHOULD_PUBLISH: ${{ github.event_name == 'push' || inputs.upload_release }}
+          CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APP_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          INSTALLER_IDENTITY: ${{ secrets.MACOS_INSTALLER_IDENTITY }}
+          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
         shell: bash
         run: |
-          if [[ -z "${MACOS_NOTARY_KEY_BASE64}" || -z "${MACOS_NOTARY_KEY_ID}" || -z "${MACOS_NOTARY_ISSUER_ID}" ]]; then
-            echo "Apple notarization secrets are not configured; skipping notarization."
-            exit 0
+          if [[ "$SHOULD_PUBLISH" == "true" ]] &&
+             [[ -z "$CERTIFICATE" || -z "$CERTIFICATE_PASSWORD" || -z "$APP_IDENTITY" || -z "$INSTALLER_IDENTITY" ||
+                -z "$NOTARY_KEY" || -z "$NOTARY_KEY_ID" || -z "$NOTARY_ISSUER_ID" ]]; then
+            echo "Public macOS releases require both signing identities and complete notarization credentials." >&2
+            exit 1
           fi
 
-          mkdir -p "$RUNNER_TEMP/notary"
-          key_path="$RUNNER_TEMP/notary/AuthKey_${MACOS_NOTARY_KEY_ID}.p8"
-          echo "$MACOS_NOTARY_KEY_BASE64" | base64 --decode > "$key_path"
-          {
-            echo "MACOS_NOTARY_KEY_PATH=$key_path"
-            echo "MACOS_NOTARY_KEY_ID=$MACOS_NOTARY_KEY_ID"
-            echo "MACOS_NOTARY_ISSUER_ID=$MACOS_NOTARY_ISSUER_ID"
-          } >> "$GITHUB_ENV"
+      - name: Import signing certificate
+        env:
+          CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        shell: bash
+        run: |
+          if [[ -z "$CERTIFICATE" || -z "$CERTIFICATE_PASSWORD" ]]; then
+            echo "Apple signing certificate is not configured; producing an unsigned build."
+            exit 0
+          fi
+          keychain_password="${KEYCHAIN_PASSWORD:-vesper-ci-keychain}"
+          keychain="$RUNNER_TEMP/vesper.keychain-db"
+          echo "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain"
 
-      - name: Publish macOS shell
+      - name: Prepare notarization key
+        env:
+          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        shell: bash
+        run: |
+          if [[ -z "$NOTARY_KEY" || -z "$NOTARY_KEY_ID" || -z "$NOTARY_ISSUER_ID" ]]; then
+            echo "Apple notarization key is not configured; skipping notarization."
+            exit 0
+          fi
+          key_path="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+          echo "$NOTARY_KEY" | base64 --decode > "$key_path"
+          echo "MACOS_NOTARY_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+          echo "MACOS_NOTARY_KEY_ID=$NOTARY_KEY_ID" >> "$GITHUB_ENV"
+          echo "MACOS_NOTARY_ISSUER_ID=$NOTARY_ISSUER_ID" >> "$GITHUB_ENV"
+
+      - name: Publish launcher
         shell: pwsh
         run: |
           ./scripts/Publish-CrossPlatformShell.ps1 `
             -Configuration Release `
+            -Version $env:VESPER_VERSION `
             -SelfContained `
             -BuildFrontend `
             -RuntimeIdentifiers ${{ matrix.rid }}
 
-      - name: Generate macOS ICNS icon
+      - name: Run native macOS self-test
         shell: bash
-        run: npx png2icons MinecraftCheatLauncher/Assets/vesper-logo.png MinecraftCheatLauncher/Assets/vesper-app -icns
+        run: |
+          chmod +x "_build_verify/cross-platform-publish/${{ matrix.rid }}/VesperLauncher"
+          "_build_verify/cross-platform-publish/${{ matrix.rid }}/VesperLauncher" --self-test --expect-rid "${{ matrix.rid }}"
 
-      - name: Build Velopack macOS
+      - name: Generate macOS icon
+        run: npx --yes png2icons VesperLauncherApp/Assets/vesper-logo.png VesperLauncherApp/Assets/vesper-app -icns
+
+      - name: Pack Velopack update
         env:
-          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          APP_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          INSTALLER_IDENTITY: ${{ secrets.MACOS_INSTALLER_IDENTITY }}
         shell: bash
         run: |
           dotnet tool restore
-          dotnet tool run vpk -- download github --repoUrl https://github.com/wertyy111/Updates-Vesper --channel ${{ matrix.rid }} || true
-          dotnet tool run vpk -- pack -v "${VESPER_VERSION}" -p "./_build_verify/cross-platform-publish/${{ matrix.rid }}" -c ${{ matrix.rid }} -e VesperLauncher --packId Vesper.Launcher -i "MinecraftCheatLauncher/Assets/vesper-app.icns" -o "./_build_verify/release-artifacts"
+          mkdir -p "_release/${{ matrix.rid }}"
+          sign_args=()
+          if [[ -n "$APP_IDENTITY" ]]; then
+            sign_args+=(--signAppIdentity "$APP_IDENTITY")
+          fi
+          if [[ -n "$INSTALLER_IDENTITY" ]]; then
+            sign_args+=(--signInstallIdentity "$INSTALLER_IDENTITY")
+          fi
+          dotnet tool run vpk -- pack \
+            --packId Vesper.Launcher \
+            --packVersion "$VESPER_VERSION" \
+            --packDir "_build_verify/cross-platform-publish/${{ matrix.rid }}" \
+            --mainExe VesperLauncher \
+            --outputDir "_release/${{ matrix.rid }}" \
+            --channel "${{ matrix.rid }}" \
+            --runtime "${{ matrix.rid }}" \
+            --packTitle "Vesper Launcher" \
+            --packAuthors "Vesper Launcher" \
+            --icon VesperLauncherApp/Assets/vesper-app.icns \
+            "${sign_args[@]}"
 
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+      - name: Build, sign and notarize app
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+        shell: bash
+        run: |
+          app="_release/${{ matrix.rid }}/Vesper Launcher.app"
+          contents="$app/Contents"
+          mkdir -p "$contents/MacOS" "$contents/Resources"
+          cp -a "_build_verify/cross-platform-publish/${{ matrix.rid }}/." "$contents/MacOS/"
+          chmod +x "$contents/MacOS/VesperLauncher"
+          cp VesperLauncherApp/Assets/vesper-app.icns "$contents/Resources/vesper-app.icns"
+          cat > "$contents/Info.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleExecutable</key><string>VesperLauncher</string>
+            <key>CFBundleIdentifier</key><string>site.vesper.launcher</string>
+            <key>CFBundleName</key><string>Vesper Launcher</string>
+            <key>CFBundleDisplayName</key><string>Vesper Launcher</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleIconFile</key><string>vesper-app</string>
+            <key>CFBundleShortVersionString</key><string>$MACOS_BUNDLE_VERSION</string>
+            <key>CFBundleVersion</key><string>$MACOS_BUNDLE_VERSION</string>
+            <key>LSMinimumSystemVersion</key><string>12.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
+          EOF
+          plutil -lint "$contents/Info.plist"
+
+          if [[ -n "$CODESIGN_IDENTITY" ]]; then
+            codesign --deep --force --options runtime --timestamp --sign "$CODESIGN_IDENTITY" "$app"
+            codesign --verify --deep --strict --verbose=2 "$app"
+          fi
+
+          if [[ -n "${MACOS_NOTARY_KEY_PATH:-}" ]]; then
+            notary_zip="$RUNNER_TEMP/vesper-app-${{ matrix.rid }}.zip"
+            ditto -c -k --sequesterRsrc --keepParent "$app" "$notary_zip"
+            xcrun notarytool submit "$notary_zip" --key "$MACOS_NOTARY_KEY_PATH" \
+              --key-id "$MACOS_NOTARY_KEY_ID" --issuer "$MACOS_NOTARY_ISSUER_ID" --wait
+            xcrun stapler staple "$app"
+            xcrun stapler validate "$app"
+            rm -f "$notary_zip"
+          fi
+
+          zip="_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}-portable.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$zip"
+          dmg="_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}.dmg"
+          dmg_root="$RUNNER_TEMP/vesper-dmg-root-${{ matrix.rid }}"
+          rm -rf "$dmg_root"
+          mkdir -p "$dmg_root"
+          cp -a "$app" "$dmg_root/Vesper Launcher.app"
+          ln -s /Applications "$dmg_root/Applications"
+          hdiutil create -volname "Vesper Launcher" -srcfolder "$dmg_root" -ov -format UDZO "$dmg"
+          rm -rf "$dmg_root"
+
+          if [[ -n "$CODESIGN_IDENTITY" ]]; then
+            codesign --force --timestamp --sign "$CODESIGN_IDENTITY" "$dmg"
+          fi
+          if [[ -n "${MACOS_NOTARY_KEY_PATH:-}" ]]; then
+            xcrun notarytool submit "$dmg" --key "$MACOS_NOTARY_KEY_PATH" \
+              --key-id "$MACOS_NOTARY_KEY_ID" --issuer "$MACOS_NOTARY_ISSUER_ID" --wait
+            xcrun stapler staple "$dmg"
+            xcrun stapler validate "$dmg"
+            pkg="$(find "_release/${{ matrix.rid }}" -maxdepth 1 -type f -name '*.pkg' -print -quit)"
+            if [[ -n "$pkg" ]]; then
+              xcrun notarytool submit "$pkg" --key "$MACOS_NOTARY_KEY_PATH" \
+                --key-id "$MACOS_NOTARY_KEY_ID" --issuer "$MACOS_NOTARY_ISSUER_ID" --wait
+              xcrun stapler staple "$pkg"
+              xcrun stapler validate "$pkg"
+            fi
+          fi
+          rm -rf "$app"
+
+      - name: Verify macOS assets
+        env:
+          INSTALLER_IDENTITY: ${{ secrets.MACOS_INSTALLER_IDENTITY }}
+        shell: bash
+        run: |
+          test -s "_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}.dmg"
+          test -s "_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}-portable.zip"
+          hdiutil verify "_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}.dmg"
+          unzip -t "_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}-portable.zip" >/dev/null
+          mount_point="$RUNNER_TEMP/vesper-dmg-${{ matrix.rid }}"
+          mkdir -p "$mount_point"
+          hdiutil attach "_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}.dmg" -readonly -nobrowse -mountpoint "$mount_point"
+          "$mount_point/Vesper Launcher.app/Contents/MacOS/VesperLauncher" --self-test --expect-rid "${{ matrix.rid }}"
+          hdiutil detach "$mount_point"
+          pkg="$(find "_release/${{ matrix.rid }}" -maxdepth 1 -type f -name '*.pkg' -print -quit)"
+          if [[ -n "$pkg" ]]; then
+            pkgutil --expand-full "$pkg" "$RUNNER_TEMP/vesper-pkg-${{ matrix.rid }}"
+            test -f "$RUNNER_TEMP/vesper-pkg-${{ matrix.rid }}/Distribution"
+            if [[ -n "$INSTALLER_IDENTITY" ]]; then
+              pkgutil --check-signature "$pkg"
+            fi
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: vesper-${{ matrix.rid }}-dmg
-          path: |
-            _build_verify/release-artifacts/*.pkg
-            _build_verify/release-artifacts/*.zip
-            _build_verify/release-artifacts/*.nupkg
-            _build_verify/release-artifacts/releases.*.json
+          name: vesper-${{ matrix.rid }}
+          path: _release/${{ matrix.rid }}/*
           if-no-files-found: error
+          compression-level: 0
 
-  upload-release:
-    name: Upload release assets
-    needs:
-      - linux-appimage
-      - macos-dmg
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' || github.event.inputs.upload_release == 'true' }}
-
+  windows:
+    name: Windows x64
+    needs: security
+    runs-on: windows-latest
     steps:
-      - name: Download packaged artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: VesperLauncherApp/UserInterface/package-lock.json
+
+      - name: Normalize and validate version
+        shell: pwsh
+        run: |
+          $version = $env:VESPER_VERSION.TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
+            throw "Invalid semantic version: $env:VESPER_VERSION"
+          }
+          "VESPER_VERSION=$version" | Out-File $env:GITHUB_ENV -Append
+
+      - name: Require Windows signing for public releases
+        env:
+          SHOULD_PUBLISH: ${{ github.event_name == 'push' || inputs.upload_release }}
+          CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          if ($env:SHOULD_PUBLISH -eq 'true' -and
+              ([string]::IsNullOrWhiteSpace($env:CERTIFICATE) -or [string]::IsNullOrWhiteSpace($env:CERTIFICATE_PASSWORD))) {
+            throw 'Public Windows releases require WINDOWS_CERTIFICATE_PFX_BASE64 and WINDOWS_CERTIFICATE_PASSWORD.'
+          }
+
+      - name: Prepare Windows signing certificate
+        env:
+          CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE)) {
+            Write-Host 'Windows signing certificate is not configured; build-only run will remain unsigned.'
+            exit 0
+          }
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'vesper-signing.pfx'
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:CERTIFICATE))
+          "WINDOWS_CERTIFICATE_PATH=$certificatePath" | Out-File $env:GITHUB_ENV -Append
+
+      - name: Build installer and update package
+        env:
+          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PATH)) {
+            $env:VPK_SIGN_PARAMS = "/td sha256 /fd sha256 /f `"$env:WINDOWS_CERTIFICATE_PATH`" /p `"$env:CERTIFICATE_PASSWORD`" /tr http://timestamp.sectigo.com"
+          }
+          ./scripts/Publish-VelopackUpdate.ps1 `
+            -Version $env:VESPER_VERSION `
+            -ProjectPath VesperLauncherApp/VesperLauncher.csproj `
+            -OutputRoot _build_verify/velopack `
+            -SkipPreviousDownload
+          $source = "_build_verify/velopack/$env:VESPER_VERSION/Releases"
+          New-Item -ItemType Directory -Force _release/windows | Out-Null
+          Copy-Item "$source/*" _release/windows -Force
+
+          if (-not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PATH)) {
+            $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+              Where-Object FullName -Match '\\x64\\signtool\.exe$' |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1
+            if ($null -eq $signTool) { throw 'signtool.exe was not found on the Windows runner.' }
+            & $signTool.FullName sign /td sha256 /fd sha256 /f $env:WINDOWS_CERTIFICATE_PATH /p $env:CERTIFICATE_PASSWORD /tr http://timestamp.sectigo.com _release/windows/VesperLauncherSetup.exe
+            if ($LASTEXITCODE -ne 0) { throw 'Signing the public Windows setup failed.' }
+          }
+
+      - name: Verify Windows assets
+        shell: pwsh
+        run: |
+          $setup = Get-Item _release/windows/VesperLauncherSetup.exe
+          if ($setup.Length -lt 1MB) { throw 'Windows setup is unexpectedly small.' }
+          if (-not (Get-ChildItem _release/windows -Filter '*.nupkg')) { throw 'Velopack nupkg is missing.' }
+          $installRoot = Join-Path $env:RUNNER_TEMP 'vesper-installer-test'
+          $reportPath = Join-Path $env:RUNNER_TEMP 'vesper-self-test.txt'
+          $setupArguments = "/VERYSILENT /SUPPRESSMSGBOXES /DIR=`"$installRoot`" /NOLAUNCH --no-desktop-shortcut"
+          $setupProcess = Start-Process -FilePath $setup.FullName -ArgumentList $setupArguments -Wait -PassThru
+          if ($setupProcess.ExitCode -ne 0) { throw "Public setup install failed with exit code $($setupProcess.ExitCode)." }
+          $installedExe = Join-Path $installRoot 'current/VesperLauncher.exe'
+          if (-not (Test-Path $installedExe)) { throw 'Installed launcher executable is missing.' }
+          $selfTestArguments = "--self-test --expect-rid win-x64 --self-test-report `"$reportPath`""
+          $selfTest = Start-Process -FilePath $installedExe -ArgumentList $selfTestArguments -Wait -PassThru
+          if ($selfTest.ExitCode -ne 0 -or -not (Test-Path $reportPath) -or (Get-Content $reportPath -Raw).Trim() -ne 'PASS') {
+            throw 'Installed launcher self-test failed.'
+          }
+          if (-not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PATH)) {
+            foreach ($signedFile in @($setup.FullName, $installedExe, (Join-Path $installRoot 'Update.exe'))) {
+              $signature = Get-AuthenticodeSignature $signedFile
+              if ($signature.Status -ne 'Valid') { throw "Invalid Authenticode signature: $signedFile ($($signature.Status))." }
+            }
+          }
+          $updateExe = Join-Path $installRoot 'Update.exe'
+          $uninstallProcess = Start-Process -FilePath $updateExe -ArgumentList 'uninstall --silent' -Wait -PassThru
+          if ($uninstallProcess.ExitCode -ne 0) { throw "Velopack uninstall failed with exit code $($uninstallProcess.ExitCode)." }
+          Start-Sleep -Seconds 2
+          if (Test-Path $installRoot) { throw 'Velopack uninstall left the installation directory behind.' }
+          Get-ChildItem _release/windows | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vesper-windows-x64
+          path: _release/windows/*
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    name: Publish verified release
+    needs: [linux, macos, windows]
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || inputs.upload_release }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: dist
           merge-multiple: true
 
-      - name: Upload assets to GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Verify release set
+        shell: bash
+        run: |
+          version="${VESPER_VERSION#v}"
+          tag_version="${VESPER_TAG#v}"
+          if [[ "$tag_version" != "$version" ]]; then
+            echo "Release tag $VESPER_TAG does not match version $version." >&2
+            exit 1
+          fi
+          required=(
+            VesperLauncherSetup.exe
+            VesperLauncher-linux-x64.AppImage
+            VesperLauncher-linux-x64.deb
+            VesperLauncher-osx-x64.dmg
+            VesperLauncher-osx-arm64.dmg
+            VesperLauncher-osx-x64-portable.zip
+            VesperLauncher-osx-arm64-portable.zip
+          )
+          for asset in "${required[@]}"; do
+            test -s "dist/$asset" || { echo "Missing release asset: $asset" >&2; exit 1; }
+          done
+          (
+            cd dist
+            find . -maxdepth 1 -type f ! -name 'SHA256SUMS.txt' -printf '%f\0' |
+              sort -z |
+              xargs -0 sha256sum > SHA256SUMS.txt
+          )
+          test -s dist/SHA256SUMS.txt
+          find dist -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
+
+      - name: Check cross-repository token
+        env:
+          CUSTOM_TOKEN: ${{ secrets.VESPER_RELEASE_TOKEN }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REPOSITORY" != "$RELEASE_REPOSITORY" && -z "$CUSTOM_TOKEN" ]]; then
+            echo "Set the VESPER_RELEASE_TOKEN secret with write access to $RELEASE_REPOSITORY." >&2
+            exit 1
+          fi
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          repository: wertyy111/Updates-Vesper
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: |
-            dist/*.AppImage
-            dist/*.pkg
-            dist/*.zip
-            dist/*.nupkg
-            dist/releases.*.json
+          repository: ${{ env.RELEASE_REPOSITORY }}
+          tag_name: ${{ env.VESPER_TAG }}
+          name: Vesper Launcher ${{ env.VESPER_VERSION }}
+          generate_release_notes: true
           fail_on_unmatched_files: true
-          token: ${{ secrets.VPK_TOKEN }}
-
-
-
+          files: dist/*
+          token: ${{ secrets.VESPER_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}

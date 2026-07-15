@@ -2,8 +2,6 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ApiBaseUrl,
     [string]$OutputPath = (Join-Path $env:APPDATA "VesperLauncher\account-sync.json"),
-    [string]$AuthorizationHeaderName = "",
-    [string]$AuthorizationHeaderValue = "",
     [switch]$UpdateProjectTemplate
 )
 
@@ -23,8 +21,6 @@ $config = [ordered]@{
     CredentialInfoUrl = "$normalizedBaseUrl/api/v1/auth/credential-info"
     MeUrl = "$normalizedBaseUrl/api/v1/auth/me"
     LogoutUrl = "$normalizedBaseUrl/api/v1/auth/logout"
-    AuthorizationHeaderName = $AuthorizationHeaderName
-    AuthorizationHeaderValue = $AuthorizationHeaderValue
 }
 
 $configJson = $config | ConvertTo-Json -Depth 8
@@ -37,8 +33,9 @@ Set-Content -Path $OutputPath -Value $configJson -Encoding UTF8
 Write-Host "account-sync.json saved to: $OutputPath"
 
 if ($UpdateProjectTemplate) {
-    $projectTemplatePath = Join-Path $PSScriptRoot "..\..\..\MinecraftCheatLauncher\account-sync.json"
+    $projectTemplatePath = Join-Path $PSScriptRoot "..\..\..\VesperLauncherApp\account-sync.json"
     $resolvedProjectTemplatePath = [System.IO.Path]::GetFullPath($projectTemplatePath)
     Set-Content -Path $resolvedProjectTemplatePath -Value $configJson -Encoding UTF8
     Write-Host "Project template updated: $resolvedProjectTemplatePath"
 }
+

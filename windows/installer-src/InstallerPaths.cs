@@ -16,35 +16,82 @@ internal static class InstallerPaths
 
 	public static string ResolveInstallDirectory(string? installDirectoryOverride)
 	{
+		string resolved;
 		if (!string.IsNullOrWhiteSpace(installDirectoryOverride))
 		{
-			return Path.GetFullPath(installDirectoryOverride.Trim().Trim('"'));
+			resolved = Path.GetFullPath(installDirectoryOverride.Trim().Trim('"'));
 		}
-		string text = TryGetExistingInstallDirectory();
-		if (!string.IsNullOrWhiteSpace(text))
+		else
 		{
-			return Path.GetFullPath(text);
+			string? text = TryGetExistingInstallDirectory();
+			if (!string.IsNullOrWhiteSpace(text))
+			{
+				resolved = Path.GetFullPath(text);
+			}
+			else
+			{
+				resolved = Path.GetFullPath(GetDefaultInstallDirectory());
+			}
 		}
-		return Path.GetFullPath(GetDefaultInstallDirectory());
+
+		try
+		{
+			string root = Path.GetPathRoot(resolved) ?? string.Empty;
+			if (!string.IsNullOrEmpty(root) && string.Equals(resolved, root, StringComparison.OrdinalIgnoreCase))
+			{
+				resolved = Path.Combine(resolved, "Vesper Launcher");
+			}
+		}
+		catch
+		{
+			// Ignore path format errors.
+		}
+
+		return resolved;
 	}
 
 	public static string ResolveInstallDirectoryForUninstall(string? installDirectoryOverride)
 	{
+		string resolved;
 		if (!string.IsNullOrWhiteSpace(installDirectoryOverride))
 		{
-			return Path.GetFullPath(installDirectoryOverride.Trim().Trim('"'));
+			resolved = Path.GetFullPath(installDirectoryOverride.Trim().Trim('"'));
 		}
-		string directoryName = Path.GetDirectoryName(Environment.ProcessPath ?? string.Empty);
-		if (!string.IsNullOrWhiteSpace(directoryName) && LooksLikeInstalledLauncher(directoryName))
+		else
 		{
-			return Path.GetFullPath(directoryName);
+			string? directoryName = Path.GetDirectoryName(Environment.ProcessPath ?? string.Empty);
+			if (!string.IsNullOrWhiteSpace(directoryName) && LooksLikeInstalledLauncher(directoryName))
+			{
+				resolved = Path.GetFullPath(directoryName);
+			}
+			else
+			{
+				string? text = TryGetRegisteredInstallDirectory();
+				if (!string.IsNullOrWhiteSpace(text))
+				{
+					resolved = Path.GetFullPath(text);
+				}
+				else
+				{
+					resolved = ResolveInstallDirectory(null);
+				}
+			}
 		}
-		string text = TryGetRegisteredInstallDirectory();
-		if (!string.IsNullOrWhiteSpace(text))
+
+		try
 		{
-			return Path.GetFullPath(text);
+			string root = Path.GetPathRoot(resolved) ?? string.Empty;
+			if (!string.IsNullOrEmpty(root) && string.Equals(resolved, root, StringComparison.OrdinalIgnoreCase))
+			{
+				resolved = Path.Combine(resolved, "Vesper Launcher");
+			}
 		}
-		return ResolveInstallDirectory(null);
+		catch
+		{
+			// Ignore path format errors.
+		}
+
+		return resolved;
 	}
 
 	public static bool PathsEqual(string left, string right)
@@ -66,7 +113,7 @@ internal static class InstallerPaths
 
 	private static IEnumerable<string> GetCandidateInstallDirectories()
 	{
-		string text = TryGetRegisteredInstallDirectory();
+		string? text = TryGetRegisteredInstallDirectory();
 		if (!string.IsNullOrWhiteSpace(text))
 		{
 			yield return text;
@@ -79,10 +126,10 @@ internal static class InstallerPaths
 		string[] array2 = array;
 		for (int i = 0; i < array2.Length; i++)
 		{
-			string text2 = TryResolveShortcutTarget(array2[i]);
+			string? text2 = TryResolveShortcutTarget(array2[i]);
 			if (!string.IsNullOrWhiteSpace(text2))
 			{
-				string directoryName = Path.GetDirectoryName(text2);
+				string? directoryName = Path.GetDirectoryName(text2);
 				if (!string.IsNullOrWhiteSpace(directoryName))
 				{
 					yield return directoryName;
@@ -96,8 +143,8 @@ internal static class InstallerPaths
 	{
 		try
 		{
-			using RegistryKey registryKey = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\VesperLauncher", writable: false);
-			string text = registryKey?.GetValue("InstallLocation") as string;
+			using RegistryKey? registryKey = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\VesperLauncher", writable: false);
+			string? text = registryKey?.GetValue("InstallLocation") as string;
 			return string.IsNullOrWhiteSpace(text) ? null : text;
 		}
 		catch
@@ -112,7 +159,7 @@ internal static class InstallerPaths
 		{
 			return false;
 		}
-		if (File.Exists(Path.Combine(directory, "MinecraftCheatLauncher.exe")))
+		if (File.Exists(Path.Combine(directory, "VesperLauncher.exe")))
 		{
 			return true;
 		}
@@ -136,14 +183,19 @@ internal static class InstallerPaths
 			{
 				return null;
 			}
-			Type typeFromProgID = Type.GetTypeFromProgID("WScript.Shell");
-			if ((object)typeFromProgID == null)
+			Type? typeFromProgID = Type.GetTypeFromProgID("WScript.Shell");
+			if (typeFromProgID is null)
 			{
 				return null;
 			}
-			dynamic val = Activator.CreateInstance(typeFromProgID);
-			dynamic val2 = val.CreateShortcut(shortcutPath);
-			string text = val2.TargetPath as string;
+			object? shell = Activator.CreateInstance(typeFromProgID);
+			if (shell is null)
+			{
+				return null;
+			}
+			dynamic dynamicShell = shell;
+			dynamic shortcut = dynamicShell.CreateShortcut(shortcutPath);
+			string? text = shortcut.TargetPath as string;
 			return string.IsNullOrWhiteSpace(text) ? null : text;
 		}
 		catch

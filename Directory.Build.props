@@ -1,12 +1,33 @@
 <Project>
   <PropertyGroup>
-    <RestorePackagesPath>$(MSBuildThisFileDirectory).nuget\packages</RestorePackagesPath>
     <NuGetAudit>false</NuGetAudit>
+    <VesperVersion>1.0.60-beta.1</VesperVersion>
+    <VesperAssemblyVersion>1.0.60.0</VesperAssemblyVersion>
     <DefaultItemExcludes>$(DefaultItemExcludes);$(MSBuildProjectDirectory)\bin\**;$(MSBuildProjectDirectory)\obj\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'VesperLauncher' or '$(MSBuildProjectName)' == 'VesperLauncher.CrossPlatform' or '$(MSBuildProjectName)' == 'VesperLauncherSetup'">
+    <Version>$(VesperVersion)</Version>
+    <AssemblyVersion>$(VesperAssemblyVersion)</AssemblyVersion>
+    <FileVersion>$(VesperAssemblyVersion)</FileVersion>
+    <Deterministic>true</Deterministic>
+    <EmbedAllSources>false</EmbedAllSources>
+    <PublishRepositoryUrl>false</PublishRepositoryUrl>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="('$(MSBuildProjectName)' == 'VesperLauncher' or '$(MSBuildProjectName)' == 'VesperLauncher.CrossPlatform' or '$(MSBuildProjectName)' == 'VesperLauncherSetup') and '$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <IncludeSymbols>false</IncludeSymbols>
+    <IncludeSource>false</IncludeSource>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(VESPER_USER_BUILD_ROOT)' != ''">
     <BaseIntermediateOutputPath>$(VESPER_USER_BUILD_ROOT)\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
     <BaseOutputPath>$(VESPER_USER_BUILD_ROOT)\bin\$(MSBuildProjectName)\</BaseOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(VESPER_USER_BUILD_ROOT)' == ''">
+    <BaseIntermediateOutputPath>$(LOCALAPPDATA)\VesperLauncherBuild\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
   </PropertyGroup>
 </Project>

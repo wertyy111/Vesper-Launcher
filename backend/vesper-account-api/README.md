@@ -120,9 +120,7 @@ npm test
   "LoginUrl": "https://vesper-account-api-3516.vesperlauncher3516.workers.dev/api/v1/auth/login",
   "CredentialInfoUrl": "https://vesper-account-api-3516.vesperlauncher3516.workers.dev/api/v1/auth/credential-info",
   "MeUrl": "https://vesper-account-api-3516.vesperlauncher3516.workers.dev/api/v1/auth/me",
-  "LogoutUrl": "https://vesper-account-api-3516.vesperlauncher3516.workers.dev/api/v1/auth/logout",
-  "AuthorizationHeaderName": "",
-  "AuthorizationHeaderValue": ""
+  "LogoutUrl": "https://vesper-account-api-3516.vesperlauncher3516.workers.dev/api/v1/auth/logout"
 }
 ```
 
@@ -137,6 +135,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\prepare-account-sync.ps1 `
 
 - Auth, passwords, sessions, friends and presence remain in Cloudflare D1.
 - GitHub storage is intended only for non-sensitive user assets such as avatar images and skin manifests.
-- Do not ship a GitHub token inside the launcher client.
+- Never ship GitHub, Cloudflare Access, API, or service tokens inside the launcher client. Client applications cannot keep shared secrets.
 - Local account backend mode is no longer supported.
 - The launcher is configured to use the Cloudflare Worker URL.

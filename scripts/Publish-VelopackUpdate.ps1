@@ -1,14 +1,14 @@
 [CmdletBinding()]
 param(
     [string]$Version,
-    [string]$ProjectPath = 'MinecraftCheatLauncher/MinecraftCheatLauncher.csproj',
+    [string]$ProjectPath = 'VesperLauncherApp/VesperLauncher.csproj',
     [string]$RuntimeIdentifier = 'win-x64',
     [string]$Configuration = 'Release',
     [string]$Channel = 'win',
     [string]$PackId = 'Vesper.Launcher',
     [string]$PackTitle = 'Vesper Launcher',
     [string]$PackAuthors = 'Vesper Launcher',
-    [string]$MainExe = 'MinecraftCheatLauncher.exe',
+    [string]$MainExe = 'VesperLauncher.exe',
     [string]$SetupFileName = 'VesperLauncherSetup.exe',
     [string]$SetupWrapperProjectPath = 'windows/installer-src/Installer.csproj',
     [string]$RepoUrl = 'https://github.com/wertyy111/Updates-Vesper',
@@ -22,6 +22,7 @@ param(
     [bool]$ReplaceExistingRelease = $true,
     [bool]$UseSetupWrapper = $true,
     [switch]$SkipFrontendBuild,
+    [switch]$SkipProtection,
     [switch]$SkipPreviousDownload,
     [switch]$UploadDraft,
     [switch]$Publish,
@@ -337,7 +338,7 @@ function Remove-OldGitHubReleases {
             Invoke-GitHubApi -Method 'DELETE' -Uri "https://api.github.com/repos/$RepoPath/git/refs/tags/$encodedTag" | Out-Null
         }
         catch {
-            if (-not $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 404) {
+            if (-not $_.Exception.Response -or ([int]$_.Exception.Response.StatusCode -ne 404 -and [int]$_.Exception.Response.StatusCode -ne 422)) {
                 throw
             }
         }
@@ -361,7 +362,7 @@ function Remove-GitHubReleaseByTag {
         Invoke-GitHubApi -Method 'DELETE' -Uri "https://api.github.com/repos/$RepoPath/git/refs/tags/$encodedTag" | Out-Null
     }
     catch {
-        if (-not $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 404) {
+        if (-not $_.Exception.Response -or ([int]$_.Exception.Response.StatusCode -ne 404 -and [int]$_.Exception.Response.StatusCode -ne 422)) {
             throw
         }
     }
@@ -419,9 +420,19 @@ if (-not (Test-Path -LiteralPath $projectFullPath -PathType Leaf)) {
     throw "Project not found: $projectFullPath"
 }
 
-$userBuildRoot = Join-Path $repoRoot '_build_verify/dotnet'
-$env:DOTNET_CLI_HOME = Join-Path $userBuildRoot 'dotnet_home'
-$env:NUGET_PACKAGES = Join-Path $userBuildRoot 'nuget'
+$effectiveDotnetCacheRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    Join-Path $repoRoot '_build_verify/velopack'
+}
+else {
+    Resolve-RepoRelativePath -RepoRoot $repoRoot -Path $OutputRoot
+}
+$userBuildRoot = Join-Path $effectiveDotnetCacheRoot 'dotnet'
+if ([string]::IsNullOrWhiteSpace($env:DOTNET_CLI_HOME)) {
+    $env:DOTNET_CLI_HOME = Join-Path $userBuildRoot 'dotnet_home'
+}
+if ([string]::IsNullOrWhiteSpace($env:NUGET_PACKAGES)) {
+    $env:NUGET_PACKAGES = Join-Path $userBuildRoot 'nuget'
+}
 $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
 New-Item -ItemType Directory -Path $env:DOTNET_CLI_HOME, $env:NUGET_PACKAGES -Force | Out-Null
 
@@ -449,7 +460,8 @@ $buildTempDirectory = Join-Path $releaseRoot 'temp'
 $buildIntermediateDirectory = Join-Path $releaseRoot 'obj'
 $setupWrapperPublishDirectory = Join-Path $releaseRoot 'setup-wrapper-publish'
 $setupWrapperIntermediateDirectory = Join-Path $releaseRoot 'setup-wrapper-obj'
-$iconPath = Resolve-NormalizedPath (Join-Path $repoRoot 'MinecraftCheatLauncher/Assets/vesper-app.ico')
+$projectName = if (Test-Path (Join-Path $repoRoot 'VesperLauncherApp')) { 'VesperLauncherApp' } else { 'VesperLauncher' }
+$iconPath = Resolve-NormalizedPath (Join-Path $repoRoot "$projectName/Assets/vesper-app.ico")
 
 if ($SkipPreviousDownload -and (Test-Path -LiteralPath $releasesDirectory)) {
     $resolvedReleasesDirectory = Resolve-NormalizedPath $releasesDirectory
@@ -485,6 +497,21 @@ $publishArguments = @(
     "-p:SkipFrontendBuild=$($SkipFrontendBuild.IsPresent.ToString().ToLowerInvariant())"
 )
 Invoke-RepoDotnet -RepoRoot $repoRoot -Arguments $publishArguments
+
+$frontendDist = Join-Path (Split-Path -Parent $projectFullPath) 'UserInterface/dist'
+$publishedFrontend = Join-Path $publishDirectory 'UserInterface/dist'
+if (-not (Test-Path -LiteralPath (Join-Path $frontendDist 'index.html') -PathType Leaf)) {
+    throw "Frontend build output is missing: $frontendDist"
+}
+New-Item -ItemType Directory -Force -Path $publishedFrontend | Out-Null
+Copy-Item -Path (Join-Path $frontendDist '*') -Destination $publishedFrontend -Recurse -Force
+
+if ($Configuration -eq 'Release' -and -not $SkipProtection) {
+    & (Join-Path $PSScriptRoot 'Protect-ReleaseBinaries.ps1') -PublishDirectory $publishDirectory
+    if ($LASTEXITCODE -ne 0) {
+        throw "Release protection failed with exit code $LASTEXITCODE."
+    }
+}
 
 Write-Host "Restoring Velopack CLI..."
 Invoke-RepoDotnet -RepoRoot $repoRoot -Arguments @('tool', 'restore')
@@ -634,3 +661,4 @@ if ($null -eq $previousTmp) {
 else {
     $env:TMP = $previousTmp
 }
+

@@ -25,6 +25,7 @@ _tmp_probe/
 _tmp_catalog_probe/
 _latest_fixed_launcher/
 MinecraftCheatLauncher/_temp_build/
+VesperLauncherApp/_temp_build/
 
 # Installer staging artifacts
 _windows_build/payload*.zip
@@ -49,3 +50,12 @@ MinecraftCheatLauncher/UserInterface/dist/
 MinecraftCheatLauncher/UserInterface/*.tsbuildinfo
 MinecraftCheatLauncher/UserInterface/vite.config.js
 MinecraftCheatLauncher/UserInterface/vite.config.d.ts
+VesperLauncherApp/**/GameData/
+VesperLauncherApp/**/.launcher-data/
+VesperLauncherApp/**/.launcher-temp/
+VesperLauncherApp/**/*.WebView2/
+VesperLauncherApp/UserInterface/node_modules/
+VesperLauncherApp/UserInterface/dist/
+VesperLauncherApp/UserInterface/*.tsbuildinfo
+VesperLauncherApp/UserInterface/vite.config.js
+VesperLauncherApp/UserInterface/vite.config.d.ts

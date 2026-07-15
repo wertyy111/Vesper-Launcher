@@ -10,9 +10,6 @@
     <VelopackSetup>..\..\_build_verify\velopack\1.0.43-beta.1\Releases\Vesper.Launcher-win-Setup.exe</VelopackSetup>
     <AssemblyName>VesperLauncherSetup</AssemblyName>
     <RootNamespace>VesperLauncherSetup</RootNamespace>
-    <Version>1.0.41</Version>
-    <AssemblyVersion>1.0.41.0</AssemblyVersion>
-    <FileVersion>1.0.41.0</FileVersion>
     <Company>Vesper Launcher</Company>
     <Product>Vesper Launcher Setup</Product>
     <Copyright>Copyright (c) 2026 Vesper Launcher</Copyright>
@@ -22,9 +19,10 @@
 
   <ItemGroup>
     <EmbeddedResource Include="$(VelopackSetup)" LogicalName="velopack-setup.exe" Condition="Exists('$(VelopackSetup)')" />
-    <EmbeddedResource Include="..\..\MinecraftCheatLauncher\Assets\vesper-logo.png" LogicalName="vesper-logo.png" />
-    <EmbeddedResource Include="..\..\MinecraftCheatLauncher\Assets\vesper-logo.jpg" LogicalName="vesper-logo.jpg" />
-    <EmbeddedResource Include="..\..\MinecraftCheatLauncher\Assets\vesper-launcher-wordmark.png" LogicalName="vesper-launcher-wordmark.png" />
+    <EmbeddedResource Include="..\..\VesperLauncherApp\Assets\vesper-logo.png" LogicalName="vesper-logo.png" />
+    <EmbeddedResource Include="..\..\VesperLauncherApp\Assets\vesper-logo.jpg" LogicalName="vesper-logo.jpg" Condition="Exists('..\..\VesperLauncherApp\Assets\vesper-logo.jpg')" />
+    <EmbeddedResource Include="..\..\VesperLauncherApp\Assets\vesper-launcher-wordmark.png" LogicalName="vesper-launcher-wordmark.png" />
     <EmbeddedResource Include="..\..\LICENSE.txt" LogicalName="installer-license.txt" />
   </ItemGroup>
 </Project>
+

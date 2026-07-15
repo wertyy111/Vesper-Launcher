@@ -5,7 +5,7 @@ internal sealed record InstallerOptions(string? InstallDirectoryOverride, bool R
 {
 	public static InstallerOptions Parse(string[] args)
 	{
-		string installDirectoryOverride = null;
+		string? installDirectoryOverride = null;
 		bool runSilently = false;
 		bool suppressMessageBoxes = false;
 		bool closeApplications = false;

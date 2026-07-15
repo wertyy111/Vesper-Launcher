@@ -12,6 +12,8 @@ internal static class InstallerOperations
     public static InstallResult Install(InstallerOptions options, Action<InstallProgress> reportProgress)
     {
         var installDir = InstallerPaths.ResolveInstallDirectory(options.InstallDirectoryOverride);
+        Report(reportProgress, "Закрываем запущенный лаунчер...", 3);
+        KillRunningLauncherProcesses();
         Report(reportProgress, "Проверяем папку установки...", 5);
         Directory.CreateDirectory(installDir);
         EnsureEnoughFreeSpace(installDir);
@@ -27,7 +29,7 @@ internal static class InstallerOperations
             if (launcherExe is null)
             {
                 throw new InvalidOperationException(
-                    "Установка завершилась, но MinecraftCheatLauncher.exe не найден. Попробуй выбрать другую папку или запустить установщик еще раз.");
+                    "Установка завершилась, но VesperLauncher.exe не найден. Попробуй выбрать другую папку или запустить установщик еще раз.");
             }
 
             Report(reportProgress, "Установка завершена.", 100);
@@ -42,6 +44,8 @@ internal static class InstallerOperations
     public static UninstallResult Uninstall(InstallerOptions options, Action<InstallProgress> reportProgress)
     {
         var installDir = InstallerPaths.ResolveInstallDirectoryForUninstall(options.InstallDirectoryOverride);
+        Report(reportProgress, "Закрываем запущенный лаунчер...", 5);
+        KillRunningLauncherProcesses();
         var updateExe = FindInstalledUpdateExe(installDir);
         if (updateExe is null)
         {
@@ -49,13 +53,24 @@ internal static class InstallerOperations
         }
 
         Report(reportProgress, "Запускаем удаление Vesper Launcher...", 20);
-        var process = Process.Start(new ProcessStartInfo
+        var uninstallStartInfo = new ProcessStartInfo
         {
             FileName = updateExe,
             UseShellExecute = false
-        });
+        };
+        uninstallStartInfo.ArgumentList.Add("uninstall");
+        if (options.RunSilently)
+        {
+            uninstallStartInfo.ArgumentList.Add("--silent");
+        }
+
+        using var process = Process.Start(uninstallStartInfo);
 
         process?.WaitForExit();
+        if (process is null || process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"Velopack uninstall завершился с кодом {process?.ExitCode.ToString() ?? "unknown"}.");
+        }
         Report(reportProgress, "Удаление передано Velopack.", 100);
         return new UninstallResult(installDir, options.RemoveUserData);
     }
@@ -90,7 +105,7 @@ internal static class InstallerOperations
                 "В установщик не встроен Velopack setup. Пересобери setup через Publish-VelopackUpdate.ps1.");
         }
 
-        var tempDirectory = Path.Combine(installDir, ".vesper-setup-temp", Guid.NewGuid().ToString("N"));
+        var tempDirectory = Path.Combine(Path.GetTempPath(), "VesperSetupTemp", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDirectory);
         var setupPath = Path.Combine(tempDirectory, "Vesper.Internal.Setup.exe");
 
@@ -149,8 +164,8 @@ internal static class InstallerOperations
     {
         var candidates = new[]
         {
-            Path.Combine(installDir, "current", "MinecraftCheatLauncher.exe"),
-            Path.Combine(installDir, "MinecraftCheatLauncher.exe")
+            Path.Combine(installDir, "current", "VesperLauncher.exe"),
+            Path.Combine(installDir, "VesperLauncher.exe")
         };
 
         foreach (var candidate in candidates)
@@ -162,7 +177,7 @@ internal static class InstallerOperations
         }
 
         return Directory.Exists(installDir)
-            ? Directory.EnumerateFiles(installDir, "MinecraftCheatLauncher.exe", SearchOption.AllDirectories)
+            ? Directory.EnumerateFiles(installDir, "VesperLauncher.exe", SearchOption.AllDirectories)
                 .OrderBy(path => path.Length)
                 .FirstOrDefault()
             : null;
@@ -224,4 +239,33 @@ internal static class InstallerOperations
 
         return $"{value:0.##} {units[unit]}";
     }
+
+    private static void KillRunningLauncherProcesses()
+    {
+        try
+        {
+            var names = new[] { "VesperLauncher", "Vesper.Launcher", "VesperLauncher" };
+            foreach (var name in names)
+            {
+                var processes = Process.GetProcessesByName(name);
+                foreach (var process in processes)
+                {
+                    try
+                    {
+                        process.Kill();
+                        process.WaitForExit(5000);
+                    }
+                    catch
+                    {
+                        // Ignore
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Ignore
+        }
+    }
 }
+
