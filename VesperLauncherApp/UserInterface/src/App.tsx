@@ -119,6 +119,18 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!loadingState) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setRuntimeError('Лаунчер не получил данные от внутреннего сервиса. Нажмите «Повторить».');
+    }, 12000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadingState]);
+
+  useEffect(() => {
     if (loadingState) {
       return;
     }
@@ -487,7 +499,14 @@ function App() {
       <div className="background-vignette" />
 
       {loadingState ? (
-        <LoadingScreen hostSnapshot={hostSnapshot} runtimeError={runtimeError} />
+        <LoadingScreen
+          hostSnapshot={hostSnapshot}
+          runtimeError={runtimeError}
+          onRetry={() => {
+            setRuntimeError(null);
+            photinoBridge.requestSnapshot();
+          }}
+        />
       ) : (
         <div className="launcher-frame">
         {RESIZE_DIRECTIONS.map((direction) => (

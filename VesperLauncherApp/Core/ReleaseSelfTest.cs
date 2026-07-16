@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using VesperLauncher.PhotinoHost;
 
 namespace VesperLauncher.Core;
 
@@ -36,6 +37,7 @@ internal static class ReleaseSelfTest
         CheckUpdateConfiguration(baseDirectory, failures);
         CheckReleaseHygiene(baseDirectory, failures);
         CheckForSecretMarkers(baseDirectory, failures);
+        CheckBridgeSerialization(failures);
 
         if (!string.IsNullOrWhiteSpace(reportPath))
         {
@@ -173,6 +175,35 @@ internal static class ReleaseSelfTest
                     failures.Add($"Possible secret marker found in {Path.GetRelativePath(root, path)}: {Encoding.ASCII.GetString(marker)}");
                 }
             }
+        }
+    }
+
+    private static void CheckBridgeSerialization(ICollection<string> failures)
+    {
+        try
+        {
+            using var backendHost = LauncherBackendHostFactory.CreateCurrent();
+            var snapshot = backendHost.GetSnapshotAsync().GetAwaiter().GetResult();
+            var envelopeJson = JsonSerializer.Serialize(new
+            {
+                type = "snapshot",
+                data = snapshot
+            });
+
+            using var document = JsonDocument.Parse(envelopeJson);
+            var root = document.RootElement;
+            if (!root.TryGetProperty("type", out var type) ||
+                !string.Equals(type.GetString(), "snapshot", StringComparison.Ordinal) ||
+                !root.TryGetProperty("data", out var data) ||
+                data.ValueKind != JsonValueKind.Object ||
+                !data.TryGetProperty("launcher", out _))
+            {
+                failures.Add("Bridge snapshot envelope is incomplete after serialization.");
+            }
+        }
+        catch (Exception ex)
+        {
+            failures.Add("Bridge snapshot serialization failed: " + ex.Message);
         }
     }
 

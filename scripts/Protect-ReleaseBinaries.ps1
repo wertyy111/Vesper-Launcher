@@ -52,9 +52,14 @@ $config = @"
   <Var name="UseUnicodeNames" value="true" />
   <Var name="RenameProperties" value="false" />
   <Var name="RenameEvents" value="false" />
+  <Var name="SkipSpecialName" value="true" />
   <Var name="SkipGenerated" value="true" />
   <Var name="ReuseNames" value="true" />
-  <Module file="$escapedAssembly" />
+  <Module file="$escapedAssembly">
+    <SkipType name="*" decorator="System.Runtime.CompilerServices.CompilerGeneratedAttribute" skipMethods="true" skipFields="true" skipProperties="true" skipEvents="true" />
+    <SkipMethod type="*" name=".ctor" />
+    <SkipMethod type="*" name=".cctor" />
+  </Module>
 </Obfuscator>
 "@
 [System.IO.File]::WriteAllText($configPath, $config, [System.Text.UTF8Encoding]::new($false))

@@ -1,6 +1,14 @@
 import type { HostSnapshot } from '../../types';
 
-export function LoadingScreen({ hostSnapshot, runtimeError }: { hostSnapshot: HostSnapshot | null; runtimeError: string | null }) {
+export function LoadingScreen({
+  hostSnapshot,
+  runtimeError,
+  onRetry
+}: {
+  hostSnapshot: HostSnapshot | null;
+  runtimeError: string | null;
+  onRetry: () => void;
+}) {
   const update = hostSnapshot?.update;
   const isIndeterminate = update?.isIndeterminate ?? true;
   const progressPercent = update?.progressPercent ?? 0;
@@ -33,7 +41,22 @@ export function LoadingScreen({ hostSnapshot, runtimeError }: { hostSnapshot: Ho
 
         {runtimeError || hostSnapshot?.errorMessage ? (
           <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(220, 38, 38, 0.2)', color: '#f87171', borderRadius: '8px', fontSize: '13px' }}>
-            {runtimeError || hostSnapshot?.errorMessage}
+            <div>{runtimeError || hostSnapshot?.errorMessage}</div>
+            <button
+              type="button"
+              onClick={onRetry}
+              style={{
+                marginTop: '12px',
+                padding: '9px 18px',
+                border: '1px solid rgba(255,255,255,0.18)',
+                borderRadius: '8px',
+                background: '#4f46e5',
+                color: '#fff',
+                cursor: 'pointer'
+              }}
+            >
+              Повторить
+            </button>
           </div>
         ) : null}
       </div>

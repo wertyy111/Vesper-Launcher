@@ -30,14 +30,14 @@ internal static class Program
 
 		public bool IsUiReady => Volatile.Read(in _uiReady) == 1;
 
-		public void MarkClientReady()
+		public bool MarkClientReady()
 		{
-			Volatile.Write(ref _clientReady, 1);
+			return Interlocked.Exchange(ref _clientReady, 1) == 0;
 		}
 
-		public void MarkUiReady()
+		public bool MarkUiReady()
 		{
-			Volatile.Write(ref _uiReady, 1);
+			return Interlocked.Exchange(ref _uiReady, 1) == 0;
 		}
 	}
 
@@ -100,7 +100,10 @@ internal static class Program
 				{
 					if (sender is PhotinoWindow window2)
 					{
-						snapshotTransport.MarkClientReady();
+						if (snapshotTransport.MarkClientReady())
+						{
+							TryWriteLog($"[{DateTime.Now:O}] STARTUP: web-message bridge connected.{Environment.NewLine}");
+						}
 						_ = HandleIncomingMessageAsync(window2, message, backendHost, bridgeLock, snapshotTransport, shutdown.Token);
 					}
 				});
@@ -110,6 +113,7 @@ internal static class Program
 				{
 					window.RegisterWindowCreatedHandler(delegate(object? sender, EventArgs e)
 					{
+						TryWriteLog($"[{DateTime.Now:O}] STARTUP: splash window created.{Environment.NewLine}");
 						WindowChrome.ApplySplashWindowBounds(window);
 						WindowChrome.ApplyWindowBackdrop(window, 3);
 						windowCreated.TrySetResult();
@@ -124,17 +128,32 @@ internal static class Program
 						{
 							await windowCreated.Task.ConfigureAwait(false);
 							
-							var readyTask = backendHost.WaitForLauncherReadyAsync();
-							var delayTask = Task.Delay(4000);
-							await Task.WhenAll(readyTask, delayTask).ConfigureAwait(false);
-							
-							if (readyTask.Result)
+							var minimumSplashTask = Task.Delay(1500);
+							bool shouldShowLauncher;
+							try
+							{
+								shouldShowLauncher = await backendHost.WaitForLauncherReadyAsync()
+									.WaitAsync(TimeSpan.FromSeconds(35), shutdown.Token)
+									.ConfigureAwait(false);
+							}
+							catch (TimeoutException)
+							{
+								shouldShowLauncher = true;
+								TryWriteLog($"[{DateTime.Now:O}] WARNING: backend startup timed out; opening launcher with fallback state.{Environment.NewLine}");
+							}
+
+							await minimumSplashTask.ConfigureAwait(false);
+							TryWriteLog($"[{DateTime.Now:O}] STARTUP: backend decision completed (show={shouldShowLauncher}).{Environment.NewLine}");
+
+							if (shouldShowLauncher)
 							{
 								WindowChrome.SetWindowVisibility(window, false);
 								WindowChrome.TryApplyLauncherWindowBounds(window, updatePosition: true);
 								window.Load(localStaticFileServer.BaseUrl);
+								TryWriteLog($"[{DateTime.Now:O}] STARTUP: main UI requested.{Environment.NewLine}");
 								snapshotLoop = RunSnapshotLoopAsync(window, backendHost, bridgeLock, snapshotTransport, shutdown.Token);
 								await WaitForLauncherUiReadyAsync(snapshotTransport, shutdown.Token).ConfigureAwait(continueOnCapturedContext: false);
+								TryWriteLog($"[{DateTime.Now:O}] STARTUP: UI preload wait completed (ready={snapshotTransport.IsUiReady}).{Environment.NewLine}");
 								WindowChrome.TryApplyLauncherWindowBounds(window, updatePosition: true);
 								WindowChrome.ApplyWindowBackdrop(window, 0);
 								WindowChrome.SetWindowVisibility(window, true);
@@ -590,7 +609,10 @@ internal static class Program
 				switch (normalizedCommand)
 				{
 				case "client.uiready":
-					snapshotTransport.MarkUiReady();
+					if (snapshotTransport.MarkUiReady())
+					{
+						TryWriteLog($"[{DateTime.Now:O}] STARTUP: UI ready received through web-message bridge.{Environment.NewLine}");
+					}
 					break;
 				case "host.minimize":
 					window.Invoke(delegate
@@ -654,7 +676,10 @@ internal static class Program
 			string? command = ((rootElement.TryGetProperty("command", out value) && value.ValueKind == JsonValueKind.String) ? value.GetString() : ((rootElement.TryGetProperty("type", out value2) && value2.ValueKind == JsonValueKind.String) ? value2.GetString() : null));
 			JsonElement value3;
 			JsonElement payload = (rootElement.TryGetProperty("payload", out value3) ? value3.Clone() : default(JsonElement));
-			snapshotTransport.MarkClientReady();
+			if (snapshotTransport.MarkClientReady())
+			{
+				TryWriteLog($"[{DateTime.Now:O}] STARTUP: HTTP bridge connected.{Environment.NewLine}");
+			}
 			if (!string.IsNullOrWhiteSpace(command))
 			{
 				string normalizedCommand = command.Trim().ToLowerInvariant();
@@ -682,7 +707,10 @@ internal static class Program
 					switch (normalizedCommand)
 					{
 					case "client.uiready":
-						snapshotTransport.MarkUiReady();
+						if (snapshotTransport.MarkUiReady())
+						{
+							TryWriteLog($"[{DateTime.Now:O}] STARTUP: UI ready received through HTTP bridge.{Environment.NewLine}");
+						}
 						break;
 					case "host.minimize":
 						window.Invoke(delegate
