@@ -57,6 +57,10 @@ jobs:
             echo 'Embedded credential material is forbidden.' >&2
             exit 1
           fi
+          if git grep -nEi "(password|token)[[:space:]]*:[[:space:]]*['\"][^'\"]{12,}" -- '*deploy*.js' '*ssh*.js'; then
+            echo 'Hard-coded deployment credentials are forbidden.' >&2
+            exit 1
+          fi
 
   linux:
     name: Linux x64
