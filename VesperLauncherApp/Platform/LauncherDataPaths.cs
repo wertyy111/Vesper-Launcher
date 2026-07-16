@@ -5,6 +5,7 @@ namespace VesperLauncher.Platform;
 
 internal static class LauncherDataPaths
 {
+    private const string DataRootEnvironmentVariable = "VESPER_DATA_ROOT";
     private const string InstallLocalDataDirectoryName = ".launcher-data";
     private const string LegacyWindowsDataDirectoryName = "VesperLauncher";
     private const long MinimumWritableFreeBytes = 64L * 1024L * 1024L;
@@ -13,6 +14,13 @@ internal static class LauncherDataPaths
 
     public static string GetPreferredDataDirectory()
     {
+        var overriddenDataDirectory = Environment.GetEnvironmentVariable(DataRootEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(overriddenDataDirectory) &&
+            TryEnsureWritableDirectory(overriddenDataDirectory, out var writableOverride))
+        {
+            return writableOverride;
+        }
+
         var candidates = new[]
         {
             GetInstallLocalDataDirectory(ensureExists: false),

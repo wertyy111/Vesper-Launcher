@@ -31,6 +31,12 @@ public sealed class PlatformPathService : IPlatformPathService
 
     public string GetLauncherDataDirectory()
     {
+        var overriddenDataDirectory = Environment.GetEnvironmentVariable("VESPER_DATA_ROOT");
+        if (!string.IsNullOrWhiteSpace(overriddenDataDirectory))
+        {
+            return EnsureDirectory(overriddenDataDirectory);
+        }
+
         return EnsureDirectory(Path.Combine(UserDataDirectory, LauncherDirectoryName));
     }
 

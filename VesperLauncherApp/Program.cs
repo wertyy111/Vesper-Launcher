@@ -94,6 +94,7 @@ internal static class Program
 				SnapshotTransportState snapshotTransport = new SnapshotTransportState();
 				backendHost.Start();
 				using LocalStaticFileServer localStaticFileServer = LocalStaticFileServer.Start();
+				TryWriteLog($"[{DateTime.Now:O}] STARTUP: local UI server {localStaticFileServer.BaseUrl}.{Environment.NewLine}");
 				PhotinoWindow window = CreateWindow(localStaticFileServer.BaseUrl, startOffscreen: false);
 				localStaticFileServer.BridgeMessageHandler = (string rawMessage) => HandleHttpBridgeMessageAsync(window, rawMessage, backendHost, bridgeLock, snapshotTransport, shutdown.Token);
 				window.RegisterWebMessageReceivedHandler(delegate(object? sender, string message)
@@ -261,14 +262,14 @@ internal static class Program
 				background: transparent;
 			}
 			.container {
-				width: calc(100% - 16px);
-				height: calc(100% - 16px);
+				width: 100%;
+				height: 100%;
 				padding: 24px 28px;
 				display: flex;
 				flex-direction: column;
 				justify-content: center;
 				text-align: left;
-				border-radius: var(--radius);
+				border-radius: 24px;
 				background: var(--glass-bg);
 				border: 1px solid var(--glass-border);
 				box-shadow: none;
@@ -483,7 +484,6 @@ internal static class Program
 	private static PhotinoWindow CreateWindow(string startUrl, bool startOffscreen)
 	{
 		string? text = ResolveIconPath();
-		var windowBounds = LauncherWindowState.Load();
 		PhotinoWindow photinoWindow = new PhotinoWindow
 		{
 			Title = "Vesper Launcher",
@@ -494,10 +494,10 @@ internal static class Program
 			Centered = !startOffscreen,
 			UseOsDefaultLocation = false,
 			UseOsDefaultSize = false,
-			Width = windowBounds.Width,
-			Height = windowBounds.Height,
-			MinWidth = LauncherWindowState.MinWidth,
-			MinHeight = LauncherWindowState.MinHeight,
+			Width = 440,
+			Height = 240,
+			MinWidth = 440,
+			MinHeight = 240,
 			Transparent = true
 		};
 		if (startOffscreen && WindowChrome.SupportsNativeWindowShaping)

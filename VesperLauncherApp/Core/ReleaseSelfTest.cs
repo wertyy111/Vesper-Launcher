@@ -15,6 +15,12 @@ namespace VesperLauncher.Core;
 internal static class ReleaseSelfTest
 {
     private static readonly string[] ForbiddenExtensions = [".cs", ".csproj", ".pdb", ".map", ".sln"];
+    private static readonly string[] ForbiddenUserStateFiles =
+    [
+        "account-state.json",
+        "account-friends-state.json",
+        "saved-usernames.json"
+    ];
     private static readonly byte[][] ForbiddenSecretMarkers =
     [
         BuildMarker("gh", "p_"),
@@ -40,7 +46,7 @@ internal static class ReleaseSelfTest
         CheckReleaseHygiene(baseDirectory, failures);
         CheckForSecretMarkers(baseDirectory, failures);
         CheckMutableGameStorage(failures);
-        CheckBridgeSerialization(failures);
+        CheckBridgeSerialization(failures, HasArgument(args, "--expect-clean-profile"));
 
         if (!string.IsNullOrWhiteSpace(reportPath))
         {
@@ -154,6 +160,11 @@ internal static class ReleaseSelfTest
             {
                 failures.Add("Development artifact leaked into release: " + relativePath);
             }
+
+            if (ForbiddenUserStateFiles.Contains(Path.GetFileName(path), StringComparer.OrdinalIgnoreCase))
+            {
+                failures.Add("User account state leaked into release: " + relativePath);
+            }
         }
 
         if (Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>() is null)
@@ -181,7 +192,7 @@ internal static class ReleaseSelfTest
         }
     }
 
-    private static void CheckBridgeSerialization(ICollection<string> failures)
+    private static void CheckBridgeSerialization(ICollection<string> failures, bool expectCleanProfile)
     {
         try
         {
@@ -195,13 +206,23 @@ internal static class ReleaseSelfTest
 
             using var document = JsonDocument.Parse(envelopeJson);
             var root = document.RootElement;
+            var hasData = root.TryGetProperty("data", out var data);
             if (!root.TryGetProperty("type", out var type) ||
                 !string.Equals(type.GetString(), "snapshot", StringComparison.Ordinal) ||
-                !root.TryGetProperty("data", out var data) ||
+                !hasData ||
                 data.ValueKind != JsonValueKind.Object ||
                 !data.TryGetProperty("launcher", out _))
             {
                 failures.Add("Bridge snapshot envelope is incomplete after serialization.");
+            }
+
+            if (expectCleanProfile &&
+                data.TryGetProperty("launcher", out var launcher) &&
+                launcher.TryGetProperty("account", out var account) &&
+                account.TryGetProperty("hasAuthenticatedSession", out var hasAuthenticatedSession) &&
+                hasAuthenticatedSession.ValueKind == JsonValueKind.True)
+            {
+                failures.Add("A clean launcher profile unexpectedly contains an authenticated account session.");
             }
         }
         catch (Exception ex)
@@ -251,6 +272,9 @@ internal static class ReleaseSelfTest
 
         return null;
     }
+
+    private static bool HasArgument(IReadOnlyList<string> args, string name) =>
+        args.Any(arg => arg.Equals(name, StringComparison.OrdinalIgnoreCase));
 
     private static byte[] BuildMarker(string prefix, string suffix) =>
         Encoding.ASCII.GetBytes(string.Concat(prefix, suffix));

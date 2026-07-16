@@ -9,11 +9,11 @@ on:
       version:
         description: "Semantic version without the v prefix"
         required: true
-        default: "1.0.60-beta.1"
+        default: "1.0.60-beta.2"
       tag:
         description: "Release tag"
         required: true
-        default: "v1.0.60-beta.1"
+        default: "v1.0.60-beta.2"
       upload_release:
         description: "Upload the verified assets to GitHub Releases"
         required: true
@@ -33,8 +33,8 @@ concurrency:
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  VESPER_VERSION: ${{ inputs.version || (github.event_name == 'pull_request' && '1.0.60-beta.1') || github.ref_name }}
-  VESPER_TAG: ${{ inputs.tag || (github.event_name == 'pull_request' && 'v1.0.60-beta.1') || github.ref_name }}
+  VESPER_VERSION: ${{ inputs.version || (github.event_name == 'pull_request' && '1.0.60-beta.2') || github.ref_name }}
+  VESPER_TAG: ${{ inputs.tag || (github.event_name == 'pull_request' && 'v1.0.60-beta.2') || github.ref_name }}
   RELEASE_REPOSITORY: wertyy111/Updates-Vesper
 
 jobs:
@@ -103,8 +103,9 @@ jobs:
       - name: Run native Linux self-test
         shell: bash
         run: |
+          export VESPER_DATA_ROOT="$RUNNER_TEMP/vesper-clean-profile-linux-x64"
           chmod +x _build_verify/cross-platform-publish/linux-x64/VesperLauncher
-          _build_verify/cross-platform-publish/linux-x64/VesperLauncher --self-test --expect-rid linux-x64
+          _build_verify/cross-platform-publish/linux-x64/VesperLauncher --self-test --expect-rid linux-x64 --expect-clean-profile
 
       - name: Pack AppImage and update package
         shell: bash
@@ -290,8 +291,9 @@ jobs:
       - name: Run native macOS self-test
         shell: bash
         run: |
+          export VESPER_DATA_ROOT="$RUNNER_TEMP/vesper-clean-profile-${{ matrix.rid }}"
           chmod +x "_build_verify/cross-platform-publish/${{ matrix.rid }}/VesperLauncher"
-          "_build_verify/cross-platform-publish/${{ matrix.rid }}/VesperLauncher" --self-test --expect-rid "${{ matrix.rid }}"
+          "_build_verify/cross-platform-publish/${{ matrix.rid }}/VesperLauncher" --self-test --expect-rid "${{ matrix.rid }}" --expect-clean-profile
 
       - name: Generate macOS icon
         run: npx --yes png2icons VesperLauncherApp/Assets/vesper-logo.png VesperLauncherApp/Assets/vesper-app -icns
@@ -327,6 +329,7 @@ jobs:
       - name: Build, sign and notarize app
         env:
           CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          INSTALLER_IDENTITY: ${{ secrets.MACOS_INSTALLER_IDENTITY }}
         shell: bash
         run: |
           app="_release/${{ matrix.rid }}/Vesper Launcher.app"
@@ -370,13 +373,38 @@ jobs:
 
           zip="_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}-portable.zip"
           ditto -c -k --sequesterRsrc --keepParent "$app" "$zip"
+          pkg="_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}.pkg"
+          pkg_sign_args=()
+          if [[ -n "$INSTALLER_IDENTITY" ]]; then
+            pkg_sign_args+=(--sign "$INSTALLER_IDENTITY")
+          fi
+          pkgbuild --component "$app" \
+            --install-location /Applications \
+            --identifier site.vesper.launcher \
+            --version "$MACOS_BUNDLE_VERSION" \
+            "${pkg_sign_args[@]}" \
+            "$pkg"
           dmg="_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}.dmg"
           dmg_root="$RUNNER_TEMP/vesper-dmg-root-${{ matrix.rid }}"
           rm -rf "$dmg_root"
           mkdir -p "$dmg_root"
           cp -a "$app" "$dmg_root/Vesper Launcher.app"
           ln -s /Applications "$dmg_root/Applications"
-          hdiutil create -volname "Vesper Launcher" -srcfolder "$dmg_root" -ov -format UDZO "$dmg"
+          dmg_created=false
+          for attempt in 1 2 3; do
+            rm -f "$dmg"
+            if hdiutil create -volname "Vesper Launcher" -srcfolder "$dmg_root" -ov -format UDZO "$dmg"; then
+              dmg_created=true
+              break
+            fi
+            echo "hdiutil create attempt $attempt failed; retrying after cleanup." >&2
+            sync
+            sleep $((attempt * 3))
+          done
+          if [[ "$dmg_created" != "true" ]]; then
+            echo "Unable to create macOS DMG after 3 attempts." >&2
+            exit 1
+          fi
           rm -rf "$dmg_root"
 
           if [[ -n "$CODESIGN_IDENTITY" ]]; then
@@ -403,6 +431,7 @@ jobs:
         shell: bash
         run: |
           test -s "_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}.dmg"
+          test -s "_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}.pkg"
           test -s "_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}-portable.zip"
           hdiutil verify "_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}.dmg"
           unzip -t "_release/${{ matrix.rid }}/VesperLauncher-${{ matrix.rid }}-portable.zip" >/dev/null
@@ -414,7 +443,8 @@ jobs:
           pkg="$(find "_release/${{ matrix.rid }}" -maxdepth 1 -type f -name '*.pkg' -print -quit)"
           if [[ -n "$pkg" ]]; then
             pkgutil --expand-full "$pkg" "$RUNNER_TEMP/vesper-pkg-${{ matrix.rid }}"
-            test -f "$RUNNER_TEMP/vesper-pkg-${{ matrix.rid }}/Distribution"
+            test -f "$RUNNER_TEMP/vesper-pkg-${{ matrix.rid }}/PackageInfo" || \
+              test -f "$RUNNER_TEMP/vesper-pkg-${{ matrix.rid }}/Distribution"
             if [[ -n "$INSTALLER_IDENTITY" ]]; then
               pkgutil --check-signature "$pkg"
             fi
@@ -518,7 +548,8 @@ jobs:
           if ($setupProcess.ExitCode -ne 0) { throw "Public setup install failed with exit code $($setupProcess.ExitCode)." }
           $installedExe = Join-Path $installRoot 'current/VesperLauncher.exe'
           if (-not (Test-Path $installedExe)) { throw 'Installed launcher executable is missing.' }
-          $selfTestArguments = "--self-test --expect-rid win-x64 --self-test-report `"$reportPath`""
+          $env:VESPER_DATA_ROOT = Join-Path $env:RUNNER_TEMP 'vesper-clean-profile-win-x64'
+          $selfTestArguments = "--self-test --expect-rid win-x64 --expect-clean-profile --self-test-report `"$reportPath`""
           $selfTest = Start-Process -FilePath $installedExe -ArgumentList $selfTestArguments -Wait -PassThru
           if ($selfTest.ExitCode -ne 0 -or -not (Test-Path $reportPath) -or (Get-Content $reportPath -Raw).Trim() -ne 'PASS') {
             throw 'Installed launcher self-test failed.'
@@ -571,6 +602,8 @@ jobs:
             VesperLauncher-linux-x64.deb
             VesperLauncher-osx-x64.dmg
             VesperLauncher-osx-arm64.dmg
+            VesperLauncher-osx-x64.pkg
+            VesperLauncher-osx-arm64.pkg
             VesperLauncher-osx-x64-portable.zip
             VesperLauncher-osx-arm64-portable.zip
           )

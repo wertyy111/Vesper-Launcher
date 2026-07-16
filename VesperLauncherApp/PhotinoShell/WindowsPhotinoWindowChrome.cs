@@ -147,7 +147,28 @@ internal sealed class WindowsPhotinoWindowChrome : IPhotinoWindowChrome
             return;
         }
 
-        ApplyRoundedWindowShapeForCurrentBounds(handle, SplashWidth, SplashHeight, SplashCornerRadius);
+        var scale = GetWindowDpiScale(handle);
+        var nativeWidth = ScaleWindowSize(SplashWidth, scale);
+        var nativeHeight = ScaleWindowSize(SplashHeight, scale);
+        var monitor = MonitorFromWindow(handle, MonitorDefaultToNearest);
+        var monitorInfo = MonitorInfo.Create();
+        var x = 0;
+        var y = 0;
+        if (monitor != IntPtr.Zero && GetMonitorInfo(monitor, ref monitorInfo))
+        {
+            x = monitorInfo.WorkArea.Left + Math.Max(0, (monitorInfo.WorkArea.Width - nativeWidth) / 2);
+            y = monitorInfo.WorkArea.Top + Math.Max(0, (monitorInfo.WorkArea.Height - nativeHeight) / 2);
+        }
+
+        _ = SetWindowPos(
+            handle,
+            IntPtr.Zero,
+            x,
+            y,
+            nativeWidth,
+            nativeHeight,
+            SwpNoZOrder | SwpNoActivate);
+        ApplyRoundedWindowShape(handle, nativeWidth, nativeHeight, scale, SplashCornerRadius);
     }
 
     public void SetWindowVisibility(PhotinoWindow window, bool visible)
