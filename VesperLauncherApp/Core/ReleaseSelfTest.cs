@@ -6,7 +6,9 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using VesperLauncher.Launcher;
 using VesperLauncher.PhotinoHost;
+using VesperLauncher.Platform;
 
 namespace VesperLauncher.Core;
 
@@ -37,6 +39,7 @@ internal static class ReleaseSelfTest
         CheckUpdateConfiguration(baseDirectory, failures);
         CheckReleaseHygiene(baseDirectory, failures);
         CheckForSecretMarkers(baseDirectory, failures);
+        CheckMutableGameStorage(failures);
         CheckBridgeSerialization(failures);
 
         if (!string.IsNullOrWhiteSpace(reportPath))
@@ -204,6 +207,35 @@ internal static class ReleaseSelfTest
         catch (Exception ex)
         {
             failures.Add("Bridge snapshot serialization failed: " + ex.Message);
+        }
+    }
+
+    private static void CheckMutableGameStorage(ICollection<string> failures)
+    {
+        try
+        {
+            var storageDirectory = new MinecraftLauncherService().GetBaseStorageDirectory();
+            if (!MutableStoragePathResolver.TryEnsureWritableDirectory(storageDirectory))
+            {
+                failures.Add("Resolved game storage directory is not writable: " + storageDirectory);
+            }
+
+            var versionDirectory = Path.GetFullPath(AppContext.BaseDirectory)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var versionDirectoryName = Path.GetFileName(versionDirectory);
+            var storageFullPath = Path.GetFullPath(storageDirectory)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if ((versionDirectoryName.Equals("current", StringComparison.OrdinalIgnoreCase) ||
+                 versionDirectoryName.StartsWith("app-", StringComparison.OrdinalIgnoreCase)) &&
+                storageFullPath.StartsWith(versionDirectory + Path.DirectorySeparatorChar, comparison))
+            {
+                failures.Add("Mutable game storage must not be placed inside an update-managed version directory.");
+            }
+        }
+        catch (Exception ex)
+        {
+            failures.Add("Game storage validation failed: " + ex.Message);
         }
     }
 

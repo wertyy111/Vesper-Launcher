@@ -14,7 +14,7 @@ public sealed class PlatformPathService : IPlatformPathService
         UserDataDirectory = ResolveUserDataDirectory(platformKind);
         UserCacheDirectory = ResolveUserCacheDirectory(platformKind);
         LogsDirectory = Path.Combine(GetLauncherDataDirectory(), "logs");
-        MinecraftDirectory = ResolveMinecraftDirectory(platformKind);
+        MinecraftDirectory = ResolveMinecraftDirectory();
     }
 
     public PlatformKind PlatformKind { get; }
@@ -54,9 +54,10 @@ public sealed class PlatformPathService : IPlatformPathService
         return EnsureDirectory(Path.Combine(GetLauncherCacheDirectory(), "versions"));
     }
 
-    private string ResolveMinecraftDirectory(PlatformKind platformKind)
+    private string ResolveMinecraftDirectory()
     {
-        return EnsureDirectory(Path.Combine(AppContext.BaseDirectory, "GameData", "minecraft_vanilla"));
+        var gameDataRoot = MutableStoragePathResolver.ResolveGameDataRoot(UserDataDirectory);
+        return EnsureDirectory(Path.Combine(gameDataRoot, "minecraft_vanilla"));
     }
 
     private static string ResolveUserDataDirectory(PlatformKind platformKind)

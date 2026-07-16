@@ -139,123 +139,123 @@ public sealed class MinecraftLauncherService
 
     private static readonly IReadOnlyList<ModCatalogEntry> FabricModCatalog =
     [
-        new ModCatalogEntry("fabric-api", "Fabric API", "базовая библиотека для большинства Fabric-модов", "Библиотека"),
-        new ModCatalogEntry("sodium", "Sodium", "ускоряет рендер чанков", "Оптимизация"),
-        new ModCatalogEntry("lithium", "Lithium", "ускоряет игровые тики", "Оптимизация"),
-        new ModCatalogEntry("ferrite-core", "FerriteCore", "уменьшает расход памяти", "Оптимизация"),
-        new ModCatalogEntry("modernfix", "ModernFix", "убирает лаги и долгие загрузки", "Оптимизация"),
-        new ModCatalogEntry("immediatelyfast", "ImmediatelyFast", "ускоряет интерфейс и частицы", "Оптимизация"),
-        new ModCatalogEntry("c2me-fabric", "C2ME", "ускоряет генерацию мира и загрузку чанков", "Оптимизация"),
-        new ModCatalogEntry("entityculling", "EntityCulling", "не рисует скрытые сущности", "Оптимизация"),
-        new ModCatalogEntry("krypton", "Krypton", "ускоряет сетевой стек", "Сеть"),
-        new ModCatalogEntry("lazydfu", "LazyDFU", "ускоряет запуск и загрузку данных", "Загрузка"),
-        new ModCatalogEntry("dynamic-fps", "Dynamic FPS", "снижает нагрузку, когда игра в фоне", "Оптимизация"),
-        new ModCatalogEntry("cull-leaves", "Cull Leaves", "оптимизация отрисовки листвы", "Оптимизация"),
-        new ModCatalogEntry("exordium", "Exordium", "ускоряет меню и интерфейс", "Оптимизация"),
-        new ModCatalogEntry("sodium-extra", "Sodium Extra", "расширенные графические настройки", "Графика"),
-        new ModCatalogEntry("reeses-sodium-options", "Reese's Sodium Options", "удобное меню настроек Sodium", "Графика"),
-        new ModCatalogEntry("indium", "Indium", "совместимость Sodium с Fabric API", "Совместимость"),
-        new ModCatalogEntry("iris", "Iris", "шейдеры для Fabric", "Шейдеры"),
-        new ModCatalogEntry("starlight", "Starlight", "быстрое освещение", "Освещение"),
-        new ModCatalogEntry("continuity", "Continuity", "соединенные текстуры", "Графика"),
-        new ModCatalogEntry("modmenu", "Mod Menu", "список установленных модов в игре", "Интерфейс"),
-        new ModCatalogEntry("cloth-config", "Cloth Config", "настройки модов в меню", "Интерфейс"),
-        new ModCatalogEntry("yet-another-config-lib", "YACL", "современная библиотека настроек", "Библиотека"),
-        new ModCatalogEntry("appleskin", "AppleSkin", "индикаторы еды и насыщения", "Интерфейс"),
-        new ModCatalogEntry("jade", "Jade", "подсказки по блокам и мобам", "Интерфейс"),
-        new ModCatalogEntry("shulkerboxtooltip", "Shulker Box Tooltip", "просмотр содержимого шалкера", "Интерфейс"),
-        new ModCatalogEntry("inventory-profiles-next", "Inventory Profiles Next", "сортировка инвентаря", "Интерфейс"),
-        new ModCatalogEntry("mouse-tweaks", "Mouse Tweaks", "быстрое управление инвентарем", "Интерфейс"),
-        new ModCatalogEntry("no-chat-reports", "No Chat Reports", "отключает chat report", "Безопасность"),
-        new ModCatalogEntry("betterf3", "BetterF3", "улучшенный экран отладки", "Интерфейс"),
-        new ModCatalogEntry("ok-zoomer", "Ok Zoomer", "плавный зум", "Интерфейс"),
-        new ModCatalogEntry("zoomify", "Zoomify", "гибкие настройки зума", "Интерфейс"),
-        new ModCatalogEntry("notenoughanimations", "Not Enough Animations", "оживляет анимации от третьего лица", "Анимации"),
-        new ModCatalogEntry("better-mount-hud", "Better Mount HUD", "аккуратный HUD для ездовых животных", "HUD"),
-        new ModCatalogEntry("raised", "Raised", "поднимает чат над хотбаром", "Интерфейс"),
-        new ModCatalogEntry("status-effect-bars", "Status Effect Bars", "удобные индикаторы эффектов", "HUD"),
-        new ModCatalogEntry("simple-voice-chat", "Simple Voice Chat", "голосовой чат", "Связь"),
-        new ModCatalogEntry("presence-footsteps", "Presence Footsteps", "улучшенные звуки шагов", "Звук"),
-        new ModCatalogEntry("dripsounds-fabric", "Drip Sounds", "звуки капель и окружения", "Звук"),
-        new ModCatalogEntry("litematica", "Litematica", "шаблоны построек", "Строительство"),
-        new ModCatalogEntry("minihud", "MiniHUD", "полезный HUD и оверлеи", "HUD"),
-        new ModCatalogEntry("tweakeroo", "Tweakeroo", "набор полезных твиков", "Удобство"),
-        new ModCatalogEntry("malilib", "MaLiLib", "библиотека для Litematica и MiniHUD", "Библиотека"),
-        new ModCatalogEntry("carpet", "Carpet", "инструменты и правила для продвинутой игры", "Твики"),
-        new ModCatalogEntry("emi", "EMI", "просмотр рецептов и предметов", "Инвентарь"),
-        new ModCatalogEntry("rei", "REI", "поиск рецептов и предметов", "Инвентарь"),
-        new ModCatalogEntry("xaeros-minimap", "Xaero's Minimap", "мини-карта в углу экрана", "Навигация"),
-        new ModCatalogEntry("xaeros-world-map", "Xaero's World Map", "большая карта мира", "Навигация"),
-        new ModCatalogEntry("journeymap", "JourneyMap", "альтернативная карта и мини-карта", "Навигация"),
-        new ModCatalogEntry("chat-heads", "Chat Heads", "аватарки игроков в чате", "Интерфейс"),
-        new ModCatalogEntry("eating-animation", "Eating Animation", "анимации еды от третьего лица", "Анимации"),
-        new ModCatalogEntry("debugify", "Debugify", "фиксы множества багов Minecraft", "Исправления"),
-        new ModCatalogEntry("enhancedblockentities", "Enhanced Block Entities", "ускоряет сундуки и таблички", "Оптимизация"),
-        new ModCatalogEntry("entity-model-features", "Entity Model Features", "поддержка моделей и эмиссии сущностей", "Графика"),
-        new ModCatalogEntry("entitytexturefeatures", "Entity Texture Features", "улучшенные текстуры сущностей", "Графика"),
-        new ModCatalogEntry("lambdynamiclights", "LambDynamicLights", "динамический свет от предметов", "Графика"),
-        new ModCatalogEntry("wavey-capes", "Wavey Capes", "анимированные плащи", "Косметика"),
-        new ModCatalogEntry("e4mc", "e4mc", "удобное подключение друзей без проброса портов", "Сеть"),
-        new ModCatalogEntry("spark", "spark", "профилирование производительности", "Диагностика"),
-        new ModCatalogEntry("architectury-api", "Architectury API", "библиотека для модов", "Библиотека")
+        new ModCatalogEntry("fabric-api", "Fabric API", "??????? ?????????? ??? ??????????? Fabric-?????", "??????????"),
+        new ModCatalogEntry("sodium", "Sodium", "???????? ?????? ??????", "???????????"),
+        new ModCatalogEntry("lithium", "Lithium", "???????? ??????? ????", "???????????"),
+        new ModCatalogEntry("ferrite-core", "FerriteCore", "????????? ?????? ??????", "???????????"),
+        new ModCatalogEntry("modernfix", "ModernFix", "??????? ???? ? ?????? ????????", "???????????"),
+        new ModCatalogEntry("immediatelyfast", "ImmediatelyFast", "???????? ????????? ? ???????", "???????????"),
+        new ModCatalogEntry("c2me-fabric", "C2ME", "???????? ????????? ???? ? ???????? ??????", "???????????"),
+        new ModCatalogEntry("entityculling", "EntityCulling", "?? ?????? ??????? ????????", "???????????"),
+        new ModCatalogEntry("krypton", "Krypton", "???????? ??????? ????", "????"),
+        new ModCatalogEntry("lazydfu", "LazyDFU", "???????? ?????? ? ???????? ??????", "????????"),
+        new ModCatalogEntry("dynamic-fps", "Dynamic FPS", "??????? ????????, ????? ???? ? ????", "???????????"),
+        new ModCatalogEntry("cull-leaves", "Cull Leaves", "??????????? ????????? ??????", "???????????"),
+        new ModCatalogEntry("exordium", "Exordium", "???????? ???? ? ?????????", "???????????"),
+        new ModCatalogEntry("sodium-extra", "Sodium Extra", "??????????? ??????????? ?????????", "???????"),
+        new ModCatalogEntry("reeses-sodium-options", "Reese's Sodium Options", "??????? ???? ???????? Sodium", "???????"),
+        new ModCatalogEntry("indium", "Indium", "????????????? Sodium ? Fabric API", "?????????????"),
+        new ModCatalogEntry("iris", "Iris", "??????? ??? Fabric", "???????"),
+        new ModCatalogEntry("starlight", "Starlight", "??????? ?????????", "?????????"),
+        new ModCatalogEntry("continuity", "Continuity", "??????????? ????????", "???????"),
+        new ModCatalogEntry("modmenu", "Mod Menu", "?????? ????????????? ????? ? ????", "?????????"),
+        new ModCatalogEntry("cloth-config", "Cloth Config", "????????? ????? ? ????", "?????????"),
+        new ModCatalogEntry("yet-another-config-lib", "YACL", "??????????? ?????????? ????????", "??????????"),
+        new ModCatalogEntry("appleskin", "AppleSkin", "?????????? ??? ? ?????????", "?????????"),
+        new ModCatalogEntry("jade", "Jade", "????????? ?? ?????? ? ?????", "?????????"),
+        new ModCatalogEntry("shulkerboxtooltip", "Shulker Box Tooltip", "???????? ??????????? ???????", "?????????"),
+        new ModCatalogEntry("inventory-profiles-next", "Inventory Profiles Next", "?????????? ?????????", "?????????"),
+        new ModCatalogEntry("mouse-tweaks", "Mouse Tweaks", "??????? ?????????? ??????????", "?????????"),
+        new ModCatalogEntry("no-chat-reports", "No Chat Reports", "????????? chat report", "????????????"),
+        new ModCatalogEntry("betterf3", "BetterF3", "?????????? ????? ???????", "?????????"),
+        new ModCatalogEntry("ok-zoomer", "Ok Zoomer", "??????? ???", "?????????"),
+        new ModCatalogEntry("zoomify", "Zoomify", "?????? ????????? ????", "?????????"),
+        new ModCatalogEntry("notenoughanimations", "Not Enough Animations", "???????? ???????? ?? ???????? ????", "????????"),
+        new ModCatalogEntry("better-mount-hud", "Better Mount HUD", "?????????? HUD ??? ??????? ????????", "HUD"),
+        new ModCatalogEntry("raised", "Raised", "????????? ??? ??? ????????", "?????????"),
+        new ModCatalogEntry("status-effect-bars", "Status Effect Bars", "??????? ?????????? ????????", "HUD"),
+        new ModCatalogEntry("simple-voice-chat", "Simple Voice Chat", "????????? ???", "?????"),
+        new ModCatalogEntry("presence-footsteps", "Presence Footsteps", "?????????? ????? ?????", "????"),
+        new ModCatalogEntry("dripsounds-fabric", "Drip Sounds", "????? ?????? ? ?????????", "????"),
+        new ModCatalogEntry("litematica", "Litematica", "??????? ????????", "?????????????"),
+        new ModCatalogEntry("minihud", "MiniHUD", "???????? HUD ? ???????", "HUD"),
+        new ModCatalogEntry("tweakeroo", "Tweakeroo", "????? ???????? ??????", "????????"),
+        new ModCatalogEntry("malilib", "MaLiLib", "?????????? ??? Litematica ? MiniHUD", "??????????"),
+        new ModCatalogEntry("carpet", "Carpet", "??????????? ? ??????? ??? ??????????? ????", "?????"),
+        new ModCatalogEntry("emi", "EMI", "???????? ???????? ? ?????????", "?????????"),
+        new ModCatalogEntry("rei", "REI", "????? ???????? ? ?????????", "?????????"),
+        new ModCatalogEntry("xaeros-minimap", "Xaero's Minimap", "????-????? ? ???? ??????", "?????????"),
+        new ModCatalogEntry("xaeros-world-map", "Xaero's World Map", "??????? ????? ????", "?????????"),
+        new ModCatalogEntry("journeymap", "JourneyMap", "?????????????? ????? ? ????-?????", "?????????"),
+        new ModCatalogEntry("chat-heads", "Chat Heads", "???????? ??????? ? ????", "?????????"),
+        new ModCatalogEntry("eating-animation", "Eating Animation", "???????? ??? ?? ???????? ????", "????????"),
+        new ModCatalogEntry("debugify", "Debugify", "????? ????????? ????? Minecraft", "???????????"),
+        new ModCatalogEntry("enhancedblockentities", "Enhanced Block Entities", "???????? ??????? ? ????????", "???????????"),
+        new ModCatalogEntry("entity-model-features", "Entity Model Features", "????????? ??????? ? ??????? ?????????", "???????"),
+        new ModCatalogEntry("entitytexturefeatures", "Entity Texture Features", "?????????? ???????? ?????????", "???????"),
+        new ModCatalogEntry("lambdynamiclights", "LambDynamicLights", "???????????? ???? ?? ?????????", "???????"),
+        new ModCatalogEntry("wavey-capes", "Wavey Capes", "????????????? ?????", "?????????"),
+        new ModCatalogEntry("e4mc", "e4mc", "??????? ??????????? ?????? ??? ???????? ??????", "????"),
+        new ModCatalogEntry("spark", "spark", "?????????????? ??????????????????", "???????????"),
+        new ModCatalogEntry("architectury-api", "Architectury API", "?????????? ??? ?????", "??????????")
     ];
 
     private static readonly IReadOnlyList<ModCatalogEntry> ForgeModCatalog =
     [
-        new ModCatalogEntry("embeddium", "Embeddium", "быстрый рендер для Forge", "Оптимизация"),
-        new ModCatalogEntry("oculus", "Oculus", "шейдеры для Forge", "Шейдеры"),
-        new ModCatalogEntry("rubidium", "Rubidium", "альтернативный рендер для Forge", "Оптимизация"),
-        new ModCatalogEntry("ferrite-core", "FerriteCore", "уменьшает расход памяти", "Оптимизация"),
-        new ModCatalogEntry("modernfix", "ModernFix", "убирает лаги и долгие загрузки", "Оптимизация"),
-        new ModCatalogEntry("entityculling", "EntityCulling", "не рисует скрытые сущности", "Оптимизация"),
-        new ModCatalogEntry("memoryleakfix", "Memory Leak Fix", "фиксит утечки памяти", "Оптимизация"),
-        new ModCatalogEntry("clumps", "Clumps", "объединяет опыт для снижения лагов", "Оптимизация"),
-        new ModCatalogEntry("jei", "JEI", "поиск рецептов и предметов", "Инвентарь"),
-        new ModCatalogEntry("balm", "Balm", "библиотека для многих Forge-модов", "Библиотека"),
-        new ModCatalogEntry("configured", "Configured", "настройка конфигов в игре", "Интерфейс"),
-        new ModCatalogEntry("controlling", "Controlling", "поиск и сортировка биндов", "Интерфейс"),
-        new ModCatalogEntry("appleskin", "AppleSkin", "индикаторы еды и насыщения", "Интерфейс"),
-        new ModCatalogEntry("jade", "Jade", "подсказки по блокам и мобам", "Интерфейс"),
-        new ModCatalogEntry("shulkerboxtooltip", "Shulker Box Tooltip", "просмотр содержимого шалкера", "Интерфейс"),
-        new ModCatalogEntry("inventory-profiles-next", "Inventory Profiles Next", "сортировка инвентаря", "Интерфейс"),
-        new ModCatalogEntry("mouse-tweaks", "Mouse Tweaks", "быстрое управление инвентарем", "Интерфейс"),
-        new ModCatalogEntry("betterf3", "BetterF3", "улучшенный экран отладки", "Интерфейс"),
-        new ModCatalogEntry("no-chat-reports", "No Chat Reports", "отключает chat report", "Безопасность"),
-        new ModCatalogEntry("simple-voice-chat", "Simple Voice Chat", "голосовой чат", "Связь"),
-        new ModCatalogEntry("presence-footsteps", "Presence Footsteps", "улучшенные звуки шагов", "Звук"),
-        new ModCatalogEntry("zoomify", "Zoomify", "гибкие настройки зума", "Интерфейс"),
-        new ModCatalogEntry("emi", "EMI", "просмотр рецептов и предметов", "Инвентарь"),
-        new ModCatalogEntry("rei", "REI", "поиск рецептов и предметов", "Инвентарь"),
-        new ModCatalogEntry("spark", "spark", "профилирование производительности", "Диагностика"),
-        new ModCatalogEntry("architectury-api", "Architectury API", "библиотека для модов", "Библиотека"),
-        new ModCatalogEntry("cloth-config", "Cloth Config", "настройки модов в меню", "Интерфейс"),
-        new ModCatalogEntry("create", "Create", "механизмы и автоматизация", "Контент"),
-        new ModCatalogEntry("farmers-delight", "Farmer's Delight", "еда и фермерские механики", "Контент"),
-        new ModCatalogEntry("waystones", "Waystones", "быстрое перемещение", "Удобство"),
-        new ModCatalogEntry("supplementaries", "Supplementaries", "декор и механики", "Контент"),
-        new ModCatalogEntry("carry-on", "Carry On", "перенос сундуков, бочек и мобов", "Удобство"),
-        new ModCatalogEntry("journeymap", "JourneyMap", "карта и мини-карта", "Навигация"),
-        new ModCatalogEntry("xaeros-minimap", "Xaero's Minimap", "мини-карта для путешествий", "Навигация"),
-        new ModCatalogEntry("xaeros-world-map", "Xaero's World Map", "подробная карта мира", "Навигация"),
-        new ModCatalogEntry("natures-compass", "Nature's Compass", "поиск биомов по миру", "Навигация"),
-        new ModCatalogEntry("structure-compass", "Structure Compass", "поиск структур и деревень", "Навигация"),
-        new ModCatalogEntry("corpse", "Corpse", "тело игрока с предметами после смерти", "Удобство"),
-        new ModCatalogEntry("trashslot", "TrashSlot", "быстрое удаление ненужных предметов", "Инвентарь"),
-        new ModCatalogEntry("better-combat", "Better Combat", "улучшенная боевая система", "Геймплей"),
-        new ModCatalogEntry("eating-animation", "Eating Animation", "анимации еды", "Анимации"),
-        new ModCatalogEntry("travelersbackpack", "Traveler's Backpack", "рюкзаки и перенос вещей", "Удобство"),
-        new ModCatalogEntry("sophisticated-core", "Sophisticated Core", "библиотека для умных хранилищ", "Библиотека"),
-        new ModCatalogEntry("sophisticated-backpacks", "Sophisticated Backpacks", "продвинутые рюкзаки", "Удобство"),
-        new ModCatalogEntry("sophisticated-storage", "Sophisticated Storage", "продвинутые сундуки и хранилища", "Инвентарь"),
-        new ModCatalogEntry("alexs-mobs", "Alex's Mobs", "большой набор новых существ", "Контент"),
-        new ModCatalogEntry("citadel", "Citadel", "библиотека для контент-модов", "Библиотека")
+        new ModCatalogEntry("embeddium", "Embeddium", "??????? ?????? ??? Forge", "???????????"),
+        new ModCatalogEntry("oculus", "Oculus", "??????? ??? Forge", "???????"),
+        new ModCatalogEntry("rubidium", "Rubidium", "?????????????? ?????? ??? Forge", "???????????"),
+        new ModCatalogEntry("ferrite-core", "FerriteCore", "????????? ?????? ??????", "???????????"),
+        new ModCatalogEntry("modernfix", "ModernFix", "??????? ???? ? ?????? ????????", "???????????"),
+        new ModCatalogEntry("entityculling", "EntityCulling", "?? ?????? ??????? ????????", "???????????"),
+        new ModCatalogEntry("memoryleakfix", "Memory Leak Fix", "?????? ?????? ??????", "???????????"),
+        new ModCatalogEntry("clumps", "Clumps", "?????????? ???? ??? ???????? ?????", "???????????"),
+        new ModCatalogEntry("jei", "JEI", "????? ???????? ? ?????????", "?????????"),
+        new ModCatalogEntry("balm", "Balm", "?????????? ??? ?????? Forge-?????", "??????????"),
+        new ModCatalogEntry("configured", "Configured", "????????? ???????? ? ????", "?????????"),
+        new ModCatalogEntry("controlling", "Controlling", "????? ? ?????????? ??????", "?????????"),
+        new ModCatalogEntry("appleskin", "AppleSkin", "?????????? ??? ? ?????????", "?????????"),
+        new ModCatalogEntry("jade", "Jade", "????????? ?? ?????? ? ?????", "?????????"),
+        new ModCatalogEntry("shulkerboxtooltip", "Shulker Box Tooltip", "???????? ??????????? ???????", "?????????"),
+        new ModCatalogEntry("inventory-profiles-next", "Inventory Profiles Next", "?????????? ?????????", "?????????"),
+        new ModCatalogEntry("mouse-tweaks", "Mouse Tweaks", "??????? ?????????? ??????????", "?????????"),
+        new ModCatalogEntry("betterf3", "BetterF3", "?????????? ????? ???????", "?????????"),
+        new ModCatalogEntry("no-chat-reports", "No Chat Reports", "????????? chat report", "????????????"),
+        new ModCatalogEntry("simple-voice-chat", "Simple Voice Chat", "????????? ???", "?????"),
+        new ModCatalogEntry("presence-footsteps", "Presence Footsteps", "?????????? ????? ?????", "????"),
+        new ModCatalogEntry("zoomify", "Zoomify", "?????? ????????? ????", "?????????"),
+        new ModCatalogEntry("emi", "EMI", "???????? ???????? ? ?????????", "?????????"),
+        new ModCatalogEntry("rei", "REI", "????? ???????? ? ?????????", "?????????"),
+        new ModCatalogEntry("spark", "spark", "?????????????? ??????????????????", "???????????"),
+        new ModCatalogEntry("architectury-api", "Architectury API", "?????????? ??? ?????", "??????????"),
+        new ModCatalogEntry("cloth-config", "Cloth Config", "????????? ????? ? ????", "?????????"),
+        new ModCatalogEntry("create", "Create", "????????? ? ?????????????", "???????"),
+        new ModCatalogEntry("farmers-delight", "Farmer's Delight", "??? ? ?????????? ????????", "???????"),
+        new ModCatalogEntry("waystones", "Waystones", "??????? ???????????", "????????"),
+        new ModCatalogEntry("supplementaries", "Supplementaries", "????? ? ????????", "???????"),
+        new ModCatalogEntry("carry-on", "Carry On", "??????? ????????, ????? ? ?????", "????????"),
+        new ModCatalogEntry("journeymap", "JourneyMap", "????? ? ????-?????", "?????????"),
+        new ModCatalogEntry("xaeros-minimap", "Xaero's Minimap", "????-????? ??? ???????????", "?????????"),
+        new ModCatalogEntry("xaeros-world-map", "Xaero's World Map", "????????? ????? ????", "?????????"),
+        new ModCatalogEntry("natures-compass", "Nature's Compass", "????? ?????? ?? ????", "?????????"),
+        new ModCatalogEntry("structure-compass", "Structure Compass", "????? ???????? ? ????????", "?????????"),
+        new ModCatalogEntry("corpse", "Corpse", "???? ?????? ? ?????????? ????? ??????", "????????"),
+        new ModCatalogEntry("trashslot", "TrashSlot", "??????? ???????? ???????? ?????????", "?????????"),
+        new ModCatalogEntry("better-combat", "Better Combat", "?????????? ?????? ???????", "????????"),
+        new ModCatalogEntry("eating-animation", "Eating Animation", "???????? ???", "????????"),
+        new ModCatalogEntry("travelersbackpack", "Traveler's Backpack", "??????? ? ??????? ?????", "????????"),
+        new ModCatalogEntry("sophisticated-core", "Sophisticated Core", "?????????? ??? ????? ????????", "??????????"),
+        new ModCatalogEntry("sophisticated-backpacks", "Sophisticated Backpacks", "??????????? ???????", "????????"),
+        new ModCatalogEntry("sophisticated-storage", "Sophisticated Storage", "??????????? ??????? ? ?????????", "?????????"),
+        new ModCatalogEntry("alexs-mobs", "Alex's Mobs", "??????? ????? ????? ???????", "???????"),
+        new ModCatalogEntry("citadel", "Citadel", "?????????? ??? ???????-?????", "??????????")
     ];
     private static LocalSkinHttpServer? LocalSkinHost;
     private static VesperAuthHttpServer? VesperAuthServer;
     private static readonly string MineSkinCachePath = LauncherDataPaths.GetDataFilePath("mineskin-cache.json");
     private static readonly string[] LegacyCustomGameDirectories =
     [
-        @"D:\Новая папка (2)\Minecraft\game"
+        @"D:\????? ????? (2)\Minecraft\game"
     ];
     private const string FallbackMinecraftLanguageCode = "ru_ru";
     private const int MaxRetainedNativesVersionDirectoriesPerProfile = 4;
@@ -364,7 +364,7 @@ public sealed class MinecraftLauncherService
 
         if (versionsById.Count == 0)
         {
-            throw new InvalidOperationException("Не удалось получить список версий.");
+            throw new InvalidOperationException("?? ??????? ???????? ?????? ??????.");
         }
 
         return versionsById.Values
@@ -597,7 +597,7 @@ public sealed class MinecraftLauncherService
     {
         if (string.IsNullOrWhiteSpace(filePrefix))
         {
-            throw new ArgumentException("Префикс временного файла не указан.", nameof(filePrefix));
+            throw new ArgumentException("??????? ?????????? ????? ?? ??????.", nameof(filePrefix));
         }
 
         var safeExtension = string.IsNullOrWhiteSpace(extensionWithDot)
@@ -650,7 +650,7 @@ public sealed class MinecraftLauncherService
             }
         }
 
-        throw new IOException("Не удалось подготовить папку для временных файлов лаунчера.");
+        throw new IOException("?? ??????? ??????????? ????? ??? ????????? ?????? ????????.");
     }
 
     private static string ResolveLauncherJavaTemporaryDirectory(string contextName)
@@ -691,7 +691,7 @@ public sealed class MinecraftLauncherService
                 var requiredMb = Math.Ceiling(criticalThreshold / 1024d / 1024d);
                 var availableMb = Math.Floor(drive.AvailableFreeSpace / 1024d / 1024d);
                 throw new IOException(
-                    $"Недостаточно свободного места для {purpose}. Диск {drive.Name}: доступно {availableMb:0} MB, нужно хотя бы {requiredMb:0} MB.");
+                    $"???????????? ?????????? ????? ??? {purpose}. ???? {drive.Name}: ???????? {availableMb:0} MB, ????? ???? ?? {requiredMb:0} MB.");
             }
         }
         catch (IOException)
@@ -787,7 +787,7 @@ public sealed class MinecraftLauncherService
         var normalizedMinecraftVersionId = NormalizeMinecraftBaseVersionId(minecraftVersionId);
         if (string.IsNullOrWhiteSpace(loaderVersionId))
         {
-            throw new ArgumentException("Версия модлоадера не указана.", nameof(loaderVersionId));
+            throw new ArgumentException("?????? ?????????? ?? ???????.", nameof(loaderVersionId));
         }
 
         var gameDirectory = GetGameDirectory(profile);
@@ -822,7 +822,7 @@ public sealed class MinecraftLauncherService
                 gameDirectory,
                 progress,
                 cancellationToken),
-            _ => throw new NotSupportedException($"Неизвестный тип модлоадера: {loaderKind}")
+            _ => throw new NotSupportedException($"??????????? ??? ??????????: {loaderKind}")
         };
     }
 
@@ -1138,13 +1138,13 @@ public sealed class MinecraftLauncherService
         var normalizedInstalledVersionId = installedVersionId?.Trim();
         if (string.IsNullOrWhiteSpace(normalizedInstalledVersionId))
         {
-            throw new ArgumentException("ID установленной версии не указан.", nameof(installedVersionId));
+            throw new ArgumentException("ID ????????????? ?????? ?? ??????.", nameof(installedVersionId));
         }
 
         if (!TryParseOptiFineLoaderId(loaderVersionId, out var optifineType, out var optifinePatch))
         {
             throw new ArgumentException(
-                $"Неверный идентификатор OptiFine '{loaderVersionId}'. Ожидается формат 'TYPE|PATCH'.",
+                $"???????? ????????????? OptiFine '{loaderVersionId}'. ????????? ?????? 'TYPE|PATCH'.",
                 nameof(loaderVersionId));
         }
 
@@ -1170,7 +1170,7 @@ public sealed class MinecraftLauncherService
 
         try
         {
-            var optifineStage = $"Скачиваю OptiFine {optifineType} {optifinePatch}...";
+            var optifineStage = $"???????? OptiFine {optifineType} {optifinePatch}...";
             progress?.Report(new LauncherProgress(optifineStage, 0, 3));
             await DownloadFileWithRetriesAsync(
                 optifineDownloadUrl,
@@ -1181,7 +1181,7 @@ public sealed class MinecraftLauncherService
 
             if (IsOptiFinePatchArchive(tempOptiFinePath))
             {
-                progress?.Report(new LauncherProgress("Подготавливаю OptiFine для Forge/Fabric...", 1, 3));
+                progress?.Report(new LauncherProgress("????????????? OptiFine ??? Forge/Fabric...", 1, 3));
                 var baseJarPath = await EnsureVersionJarAvailableAsync(
                     normalizedMinecraftVersionId,
                     gameDirectory,
@@ -1217,7 +1217,7 @@ public sealed class MinecraftLauncherService
             }
 
             File.Move(tempOptiFinePath, destinationPath);
-            progress?.Report(new LauncherProgress($"OptiFine {optifineType} {optifinePatch} добавлен в сборку.", 3, 3));
+            progress?.Report(new LauncherProgress($"OptiFine {optifineType} {optifinePatch} ???????? ? ??????.", 3, 3));
             return destinationPath;
         }
         finally
@@ -1238,13 +1238,13 @@ public sealed class MinecraftLauncherService
         var normalizedInstalledVersionId = installedVersionId?.Trim();
         if (string.IsNullOrWhiteSpace(normalizedInstalledVersionId))
         {
-            throw new ArgumentException("ID установленной версии не указан.", nameof(installedVersionId));
+            throw new ArgumentException("ID ????????????? ?????? ?? ??????.", nameof(installedVersionId));
         }
 
         if (!TryResolveOptiFabricDownloadInfo(normalizedMinecraftVersionId, out var downloadInfo))
         {
             throw new InvalidOperationException(
-                $"Для Fabric+OptiFine пока нет подходящего OptiFabric под Minecraft {normalizedMinecraftVersionId}.");
+                $"??? Fabric+OptiFine ???? ??? ??????????? OptiFabric ??? Minecraft {normalizedMinecraftVersionId}.");
         }
 
         var gameDirectory = GetGameDirectory(profile);
@@ -1263,7 +1263,7 @@ public sealed class MinecraftLauncherService
         var destinationPath = Path.Combine(modsDirectory, downloadInfo.FileName);
         var downloadUrl = BuildCurseForgeCdnDownloadUrl(downloadInfo.FileId, downloadInfo.FileName);
 
-        const string optiFabricStage = "Скачиваю OptiFabric...";
+        const string optiFabricStage = "???????? OptiFabric...";
         progress?.Report(new LauncherProgress(optiFabricStage, 0, 1));
         await DownloadFileIfNeededAsync(
             downloadUrl,
@@ -1281,7 +1281,7 @@ public sealed class MinecraftLauncherService
         var normalizedInstalledVersionId = installedVersionId?.Trim();
         if (string.IsNullOrWhiteSpace(normalizedInstalledVersionId))
         {
-            throw new ArgumentException("ID установленной версии не указан.", nameof(installedVersionId));
+            throw new ArgumentException("ID ????????????? ?????? ?? ??????.", nameof(installedVersionId));
         }
 
         var instanceDirectory = GetVersionInstanceDirectory(profile, normalizedInstalledVersionId);
@@ -1404,7 +1404,7 @@ public sealed class MinecraftLauncherService
                 .ToArray();
             var categorySummary = category.Length == 0
                 ? string.Empty
-                : $"Категория: {string.Join(", ", category)}";
+                : $"?????????: {string.Join(", ", category)}";
             ModrinthProjectMetadata? metadata = null;
             if (!string.IsNullOrWhiteSpace(normalizedBaseVersionId))
             {
@@ -1500,7 +1500,7 @@ public sealed class MinecraftLauncherService
             {
                 ModLoaderKind.Fabric => "fabric",
                 ModLoaderKind.Forge => "forge",
-                _ => throw new NotSupportedException($"Быстрый каталог Modrinth не поддерживается для {loaderKind}.")
+                _ => throw new NotSupportedException($"??????? ??????? Modrinth ?? ?????????????? ??? {loaderKind}.")
             };
 
             facets.Add(new[] { $"categories:{loaderToken}" });
@@ -1569,7 +1569,7 @@ public sealed class MinecraftLauncherService
                 string.IsNullOrWhiteSpace(iconUrl) ? null : iconUrl,
                 BuildModrinthCategorySummary(hit),
                 contentKind,
-                contentKind == RecommendedCatalogContentKind.Modpack ? "Скачать" : "Установить",
+                contentKind == RecommendedCatalogContentKind.Modpack ? "???????" : "??????????",
                 Downloads: downloads,
                 Followers: followers));
         }
@@ -1703,11 +1703,11 @@ public sealed class MinecraftLauncherService
     {
         return contentKind switch
         {
-            RecommendedCatalogContentKind.Mod => "Совместимый мод для выбранной версии.",
-            RecommendedCatalogContentKind.Shader => "Совместимый шейдерпак для выбранной версии.",
-            RecommendedCatalogContentKind.ResourcePack => "Совместимый ресурспак для выбранной версии.",
-            RecommendedCatalogContentKind.Modpack => "Совместимая готовая сборка для выбранной версии.",
-            _ => "Совместимый материал для выбранной версии."
+            RecommendedCatalogContentKind.Mod => "??????????? ??? ??? ????????? ??????.",
+            RecommendedCatalogContentKind.Shader => "??????????? ????????? ??? ????????? ??????.",
+            RecommendedCatalogContentKind.ResourcePack => "??????????? ????????? ??? ????????? ??????.",
+            RecommendedCatalogContentKind.Modpack => "??????????? ??????? ?????? ??? ????????? ??????.",
+            _ => "??????????? ???????? ??? ????????? ??????."
         };
     }
 
@@ -1719,7 +1719,7 @@ public sealed class MinecraftLauncherService
             RecommendedCatalogContentKind.Shader => "shader",
             RecommendedCatalogContentKind.ResourcePack => "resourcepack",
             RecommendedCatalogContentKind.Modpack => "modpack",
-            _ => throw new NotSupportedException($"Неизвестный тип каталога: {contentKind}")
+            _ => throw new NotSupportedException($"??????????? ??? ????????: {contentKind}")
         };
     }
 
@@ -1731,7 +1731,7 @@ public sealed class MinecraftLauncherService
             return string.Empty;
         }
 
-        return $"Категория: {string.Join(", ", categories.Take(3))}";
+        return $"?????????: {string.Join(", ", categories.Take(3))}";
     }
 
     private static string[] ReadModrinthCategories(JsonElement hit)
@@ -1772,27 +1772,27 @@ public sealed class MinecraftLauncherService
     {
         return category.ToLowerInvariant() switch
         {
-            "optimization" => "Оптимизация",
-            "library" => "Библиотека",
-            "utility" => "Утилиты",
-            "adventure" => "Приключения",
-            "decoration" => "Декор",
-            "equipment" => "Снаряжение",
-            "food" => "Еда",
-            "game-mechanics" => "Геймплей",
-            "magic" => "Магия",
-            "management" => "Управление",
-            "mobs" => "Существа",
-            "social" => "Связь",
-            "storage" => "Хранилище",
-            "technology" => "Технологии",
-            "transportation" => "Навигация",
-            "worldgen" => "Мир",
-            "audio" => "Звук",
-            "cursed" => "Эксперименты",
-            "economy" => "Экономика",
-            "misc" => "Разное",
-            "monitoring" => "Диагностика",
+            "optimization" => "???????????",
+            "library" => "??????????",
+            "utility" => "???????",
+            "adventure" => "???????????",
+            "decoration" => "?????",
+            "equipment" => "??????????",
+            "food" => "???",
+            "game-mechanics" => "????????",
+            "magic" => "?????",
+            "management" => "??????????",
+            "mobs" => "????????",
+            "social" => "?????",
+            "storage" => "?????????",
+            "technology" => "??????????",
+            "transportation" => "?????????",
+            "worldgen" => "???",
+            "audio" => "????",
+            "cursed" => "????????????",
+            "economy" => "?????????",
+            "misc" => "??????",
+            "monitoring" => "???????????",
             _ => string.IsNullOrWhiteSpace(category)
                 ? string.Empty
                 : char.ToUpperInvariant(category[0]) + category[1..]
@@ -1810,7 +1810,7 @@ public sealed class MinecraftLauncherService
     {
         if (projects is null || projects.Count == 0)
         {
-            throw new ArgumentException("Нужно выбрать хотя бы один мод.", nameof(projects));
+            throw new ArgumentException("????? ??????? ???? ?? ???? ???.", nameof(projects));
         }
 
         return await InstallRecommendedProjectsAsync(
@@ -1835,12 +1835,12 @@ public sealed class MinecraftLauncherService
     {
         if (contentKind == RecommendedCatalogContentKind.Mod)
         {
-            throw new ArgumentException("Для модов используй установку через модлоадер.", nameof(contentKind));
+            throw new ArgumentException("??? ????? ????????? ????????? ????? ?????????.", nameof(contentKind));
         }
 
         if (string.IsNullOrWhiteSpace(projectId))
         {
-            throw new ArgumentException("Не указан id проекта для загрузки.", nameof(projectId));
+            throw new ArgumentException("?? ?????? id ??????? ??? ????????.", nameof(projectId));
         }
 
         var normalizedBaseVersionId = NormalizeMinecraftBaseVersionId(minecraftBaseVersionId);
@@ -1856,12 +1856,12 @@ public sealed class MinecraftLauncherService
             RecommendedCatalogContentKind.Shader => Path.Combine(GetVersionInstanceDirectory(profile, resolvedTargetVersionId), "shaderpacks"),
             RecommendedCatalogContentKind.ResourcePack => Path.Combine(GetVersionInstanceDirectory(profile, resolvedTargetVersionId), "resourcepacks"),
             RecommendedCatalogContentKind.Modpack => Path.Combine(gameDirectory, "modpacks"),
-            _ => throw new NotSupportedException($"Неизвестный тип каталога: {contentKind}")
+            _ => throw new NotSupportedException($"??????????? ??? ????????: {contentKind}")
         };
         Directory.CreateDirectory(destinationDirectory);
 
         progress?.Report(new LauncherProgress(
-            $"Подбираю файл: {displayName}",
+            $"???????? ????: {displayName}",
             0,
             1));
 
@@ -1872,10 +1872,10 @@ public sealed class MinecraftLauncherService
         if (versionFile is null)
         {
             throw new InvalidOperationException(
-                $"Для {displayName} не найден совместимый файл под Minecraft {normalizedBaseVersionId}.");
+                $"??? {displayName} ?? ?????? ??????????? ???? ??? Minecraft {normalizedBaseVersionId}.");
         }
 
-        var downloadStage = $"Скачиваю {displayName}";
+        var downloadStage = $"???????? {displayName}";
         progress?.Report(new LauncherProgress(downloadStage, 0, 1));
 
         var destinationPath = Path.Combine(destinationDirectory, versionFile.FileName);
@@ -1903,14 +1903,14 @@ public sealed class MinecraftLauncherService
     {
         if (loaderKind is not (ModLoaderKind.Fabric or ModLoaderKind.Forge))
         {
-            throw new NotSupportedException("Автоустановка модов сейчас поддерживается только для Fabric и Forge.");
+            throw new NotSupportedException("????????????? ????? ?????? ?????????????? ?????? ??? Fabric ? Forge.");
         }
 
         var normalizedBaseVersionId = NormalizeMinecraftBaseVersionId(minecraftBaseVersionId);
         var resolvedInstalledVersionId = installedVersionId?.Trim();
         if (string.IsNullOrWhiteSpace(resolvedInstalledVersionId))
         {
-            throw new ArgumentException("ID установленной версии не указан.", nameof(installedVersionId));
+            throw new ArgumentException("ID ????????????? ?????? ?? ??????.", nameof(installedVersionId));
         }
         var requestedProjects = projects
             .Where(project => !string.IsNullOrWhiteSpace(project.ProjectId))
@@ -1918,7 +1918,7 @@ public sealed class MinecraftLauncherService
             .ToArray();
         if (requestedProjects.Length == 0)
         {
-            throw new InvalidOperationException("Список модов для установки пустой.");
+            throw new InvalidOperationException("?????? ????? ??? ????????? ??????.");
         }
 
         var gameDirectory = GetGameDirectory(profile);
@@ -1941,7 +1941,7 @@ public sealed class MinecraftLauncherService
         {
             currentProject++;
             progress?.Report(new LauncherProgress(
-                $"Подбираю моды {currentProject}/{requestedProjects.Length}: {project.DisplayName}",
+                $"???????? ???? {currentProject}/{requestedProjects.Length}: {project.DisplayName}",
                 currentProject,
                 requestedProjects.Length));
             await ResolveRecommendedModProjectAsync(
@@ -1964,7 +1964,7 @@ public sealed class MinecraftLauncherService
         foreach (var project in orderedResolvedProjects)
         {
             installIndex++;
-            var installStage = $"Скачиваю {project.DisplayName} ({installIndex}/{orderedResolvedProjects.Length})";
+            var installStage = $"???????? {project.DisplayName} ({installIndex}/{orderedResolvedProjects.Length})";
             progress?.Report(new LauncherProgress(
                 installStage,
                 installIndex - 1,
@@ -2010,7 +2010,7 @@ public sealed class MinecraftLauncherService
         if (downloadedFiles.Count == 0 && skippedProjectNames.Length == 0)
         {
             throw new InvalidOperationException(
-                $"Для {normalizedBaseVersionId} + {GetLoaderName(loaderKind)} не нашлось совместимых модов в выбранных наборах.");
+                $"??? {normalizedBaseVersionId} + {GetLoaderName(loaderKind)} ?? ??????? ??????????? ????? ? ????????? ???????.");
         }
 
         return new ModPackInstallResult(
@@ -2059,7 +2059,7 @@ public sealed class MinecraftLauncherService
             return;
         }
 
-        progress?.Report(new LauncherProgress("Проверяю Fabric API...", 0, 1));
+        progress?.Report(new LauncherProgress("???????? Fabric API...", 0, 1));
 
         var fabricApiVersion = await TryGetCompatibleModrinthVersionAsync(
             "fabric-api",
@@ -2228,7 +2228,7 @@ public sealed class MinecraftLauncherService
             : null;
         if (string.IsNullOrWhiteSpace(projectId))
         {
-            throw new InvalidDataException($"Modrinth вернул проект без id: {projectLookupId}");
+            throw new InvalidDataException($"Modrinth ?????? ?????? ??? id: {projectLookupId}");
         }
 
         var slug = root.TryGetProperty("slug", out var slugElement)
@@ -2281,7 +2281,7 @@ public sealed class MinecraftLauncherService
             ModLoaderKind.Fabric => "fabric",
             ModLoaderKind.Forge => "forge",
             ModLoaderKind.OptiFine => "optifine",
-            _ => throw new NotSupportedException($"Modrinth не поддерживается для {loaderKind}.")
+            _ => throw new NotSupportedException($"Modrinth ?? ?????????????? ??? {loaderKind}.")
         };
 
         var encodedLoaders = Uri.EscapeDataString(JsonSerializer.Serialize(new[] { loaderToken }));
@@ -2629,8 +2629,8 @@ public sealed class MinecraftLauncherService
 
         var statusText = lastStatus.HasValue ? $"{(int)lastStatus.Value} {lastStatus.Value}" : "unknown";
         throw new HttpRequestException(
-            $"Не удалось получить JSON. Статус: {statusText}. URL: {url}. " +
-            $"Проверено: {string.Join(" -> ", attempted)}",
+            $"?? ??????? ???????? JSON. ??????: {statusText}. URL: {url}. " +
+            $"?????????: {string.Join(" -> ", attempted)}",
             lastError);
     }
 
@@ -3319,7 +3319,7 @@ public sealed class MinecraftLauncherService
     {
         if (string.IsNullOrWhiteSpace(versionId))
         {
-            throw new ArgumentException("ID версии не указан.", nameof(versionId));
+            throw new ArgumentException("ID ?????? ?? ??????.", nameof(versionId));
         }
 
         var profileRoot = GetGameDirectory(profile);
@@ -3674,7 +3674,7 @@ public sealed class MinecraftLauncherService
             if (!string.IsNullOrWhiteSpace(forgeHint) &&
                 !forgeHint.Contains("N/A", StringComparison.OrdinalIgnoreCase))
             {
-                displayName += $" • {forgeHint}";
+                displayName += $" ? {forgeHint}";
             }
 
             var releaseTime = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(ordinal++);
@@ -3705,7 +3705,7 @@ public sealed class MinecraftLauncherService
         var forgeVersion = loaderVersionId.Trim();
         if (string.IsNullOrWhiteSpace(forgeVersion))
         {
-            throw new ArgumentException("Версия Forge не указана.", nameof(loaderVersionId));
+            throw new ArgumentException("?????? Forge ?? ???????.", nameof(loaderVersionId));
         }
 
         var installerUrl = string.Format(
@@ -3714,7 +3714,7 @@ public sealed class MinecraftLauncherService
             Uri.EscapeDataString(minecraftVersionId),
             Uri.EscapeDataString(forgeVersion));
 
-        var forgeStage = $"Скачиваю Forge {forgeVersion}...";
+        var forgeStage = $"???????? Forge {forgeVersion}...";
         progress?.Report(new LauncherProgress(forgeStage, 0, 2));
 
         var installerPath = CreateLauncherTemporaryFilePath(
@@ -3737,11 +3737,11 @@ public sealed class MinecraftLauncherService
             var versionJsonText = ReadZipEntryText(installerPath, "version.json");
             if (string.IsNullOrWhiteSpace(versionJsonText))
             {
-                throw new InvalidDataException("В installer Forge отсутствует файл version.json.");
+                throw new InvalidDataException("? installer Forge ??????????? ???? version.json.");
             }
 
             var versionNode = JsonNode.Parse(versionJsonText) as JsonObject
-                              ?? throw new InvalidDataException("Не удалось разобрать version.json Forge.");
+                              ?? throw new InvalidDataException("?? ??????? ????????? version.json Forge.");
 
             var installedVersionId = versionNode["id"]?.GetValue<string>()?.Trim();
             if (string.IsNullOrWhiteSpace(installedVersionId))
@@ -3770,7 +3770,7 @@ public sealed class MinecraftLauncherService
                 progress,
                 cancellationToken);
 
-            progress?.Report(new LauncherProgress($"Forge {forgeVersion} установлен.", 2, 2));
+            progress?.Report(new LauncherProgress($"Forge {forgeVersion} ??????????.", 2, 2));
             await EnsureForgeInstallerClientArtifactsAsync(
                 installerPath,
                 gameDirectory,
@@ -3814,7 +3814,7 @@ public sealed class MinecraftLauncherService
             NeoForgeInstallerMavenUrlTemplate,
             Uri.EscapeDataString(neoForgeVersion));
 
-        var neoForgeStage = $"Скачиваю NeoForge {neoForgeVersion}...";
+        var neoForgeStage = $"???????? NeoForge {neoForgeVersion}...";
         progress?.Report(new LauncherProgress(neoForgeStage, 0, 2));
 
         var installerPath = CreateLauncherTemporaryFilePath(
@@ -3879,7 +3879,7 @@ public sealed class MinecraftLauncherService
                 versionNode.ToJsonString(new JsonSerializerOptions { WriteIndented = true }),
                 cancellationToken);
 
-            progress?.Report(new LauncherProgress($"NeoForge {neoForgeVersion} установлен.", 2, 2));
+            progress?.Report(new LauncherProgress($"NeoForge {neoForgeVersion} ??????????.", 2, 2));
             return new ModLoaderInstallResult(installedVersionId, versionJsonPath);
         }
         finally
@@ -3908,7 +3908,7 @@ public sealed class MinecraftLauncherService
         var fabricLoaderVersion = loaderVersionId.Trim();
         if (string.IsNullOrWhiteSpace(fabricLoaderVersion))
         {
-            throw new ArgumentException("Версия Fabric не указана.", nameof(loaderVersionId));
+            throw new ArgumentException("?????? Fabric ?? ???????.", nameof(loaderVersionId));
         }
 
         var profileUrl = string.Format(
@@ -3917,11 +3917,11 @@ public sealed class MinecraftLauncherService
             Uri.EscapeDataString(minecraftVersionId),
             Uri.EscapeDataString(fabricLoaderVersion));
 
-        progress?.Report(new LauncherProgress($"Скачиваю Fabric {fabricLoaderVersion}...", 0, 1));
+        progress?.Report(new LauncherProgress($"???????? Fabric {fabricLoaderVersion}...", 0, 1));
 
         using var profileDocument = await GetJsonDocumentWithUserAgentAsync(profileUrl, cancellationToken);
         var profileNode = JsonNode.Parse(profileDocument.RootElement.GetRawText()) as JsonObject
-                          ?? throw new InvalidDataException("Не удалось разобрать профиль Fabric.");
+                          ?? throw new InvalidDataException("?? ??????? ????????? ??????? Fabric.");
 
         var installedVersionId = profileNode["id"]?.GetValue<string>()?.Trim();
         if (string.IsNullOrWhiteSpace(installedVersionId))
@@ -3942,7 +3942,7 @@ public sealed class MinecraftLauncherService
             profileNode.ToJsonString(new JsonSerializerOptions { WriteIndented = true }),
             cancellationToken);
 
-        progress?.Report(new LauncherProgress($"Fabric {fabricLoaderVersion} установлен.", 1, 1));
+        progress?.Report(new LauncherProgress($"Fabric {fabricLoaderVersion} ??????????.", 1, 1));
         return new ModLoaderInstallResult(installedVersionId, versionJsonPath);
     }
 
@@ -3956,7 +3956,7 @@ public sealed class MinecraftLauncherService
         if (!TryParseOptiFineLoaderId(loaderVersionId, out var optifineType, out var optifinePatch))
         {
             throw new ArgumentException(
-                $"Неверный идентификатор OptiFine '{loaderVersionId}'. Ожидается формат 'TYPE|PATCH'.",
+                $"???????? ????????????? OptiFine '{loaderVersionId}'. ????????? ?????? 'TYPE|PATCH'.",
                 nameof(loaderVersionId));
         }
 
@@ -3972,7 +3972,7 @@ public sealed class MinecraftLauncherService
         var librariesDirectory = Path.Combine(gameDirectory, "libraries");
         Directory.CreateDirectory(librariesDirectory);
 
-        var optifineInstallStage = $"Скачиваю OptiFine {optifineType} {optifinePatch}...";
+        var optifineInstallStage = $"???????? OptiFine {optifineType} {optifinePatch}...";
         progress?.Report(new LauncherProgress(optifineInstallStage, 0, 2));
         var optifineJarPath = CombineWithRoot(librariesDirectory, optifineJarRelativePath);
         await DownloadFileIfNeededAsync(
@@ -3987,12 +3987,12 @@ public sealed class MinecraftLauncherService
             librariesDirectory,
             minecraftVersionId);
 
-        progress?.Report(new LauncherProgress("Формирую профиль OptiFine...", 1, 2));
+        progress?.Report(new LauncherProgress("???????? ??????? OptiFine...", 1, 2));
 
         var baseVersion = await ResolveVersionEntryByIdAsync(minecraftVersionId, gameDirectory, cancellationToken);
         using var baseMetadata = await ResolveVersionMetadataAsync(baseVersion, gameDirectory, cancellationToken);
         var baseMetadataNode = JsonNode.Parse(baseMetadata.RootElement.GetRawText()) as JsonObject
-                               ?? throw new InvalidDataException("Не удалось разобрать metadata базовой версии для OptiFine.");
+                               ?? throw new InvalidDataException("?? ??????? ????????? metadata ??????? ?????? ??? OptiFine.");
 
         var installedVersionId = $"OptiFine {minecraftVersionId} {optifineType} {optifinePatch}";
         var metadataNode = new JsonObject
@@ -4043,7 +4043,7 @@ public sealed class MinecraftLauncherService
             metadataNode.ToJsonString(new JsonSerializerOptions { WriteIndented = true }),
             cancellationToken);
 
-        progress?.Report(new LauncherProgress($"OptiFine {optifineType} {optifinePatch} установлен.", 2, 2));
+        progress?.Report(new LauncherProgress($"OptiFine {optifineType} {optifinePatch} ??????????.", 2, 2));
         return new ModLoaderInstallResult(installedVersionId, versionJsonPath);
     }
 
@@ -4067,11 +4067,11 @@ public sealed class MinecraftLauncherService
                 !downloadsElement.TryGetProperty("client", out var clientDownload))
             {
                 throw new InvalidDataException(
-                    $"В metadata версии '{normalizedVersionId}' отсутствует client download.");
+                    $"? metadata ?????? '{normalizedVersionId}' ??????????? client download.");
             }
 
             var downloadEntry = DownloadEntry.FromJson(clientDownload, versionJarPath, "client.jar");
-            var downloadStage = $"Скачиваю Minecraft {normalizedVersionId} client.jar...";
+            var downloadStage = $"???????? Minecraft {normalizedVersionId} client.jar...";
             progress?.Report(new LauncherProgress(downloadStage, 0, 1));
             await DownloadFileIfNeededAsync(
                 downloadEntry.Url,
@@ -4083,7 +4083,7 @@ public sealed class MinecraftLauncherService
 
         if (!File.Exists(versionJarPath))
         {
-            throw new FileNotFoundException($"Не удалось подготовить jar версии {normalizedVersionId}.", versionJarPath);
+            throw new FileNotFoundException($"?? ??????? ??????????? jar ?????? {normalizedVersionId}.", versionJarPath);
         }
 
         return versionJarPath;
@@ -4107,7 +4107,7 @@ public sealed class MinecraftLauncherService
         var version = await ResolveVersionEntryByIdAsync(normalizedVersionId, gameDirectory, cancellationToken);
         if (!File.Exists(versionJsonPath))
         {
-            progress?.Report(new LauncherProgress($"Скачиваю metadata Minecraft {normalizedVersionId}...", 0, 2));
+            progress?.Report(new LauncherProgress($"???????? metadata Minecraft {normalizedVersionId}...", 0, 2));
             using var _ = await DownloadVersionMetadataAsync(version, gameDirectory, cancellationToken, progress);
         }
 
@@ -4293,7 +4293,7 @@ public sealed class MinecraftLauncherService
             return;
         }
 
-        progress?.Report(new LauncherProgress("Устанавливаю Forge client jar...", 1, 2));
+        progress?.Report(new LauncherProgress("???????????? Forge client jar...", 1, 2));
 
         if (TryExtractForgeClientFromInstaller(installerPath, clientJarPath, progress, cancellationToken))
         {
@@ -4316,7 +4316,7 @@ public sealed class MinecraftLauncherService
             if (File.Exists(workspaceJarPath))
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(clientJarPath)
-                                          ?? throw new InvalidOperationException("Некорректный путь Forge client jar."));
+                                          ?? throw new InvalidOperationException("???????????? ???? Forge client jar."));
                 File.Copy(workspaceJarPath, clientJarPath, overwrite: true);
             }
         }
@@ -4324,7 +4324,7 @@ public sealed class MinecraftLauncherService
         if (!File.Exists(clientJarPath))
         {
             throw new InvalidOperationException(
-                "Forge installer завершился без создания client jar. Проверь права доступа.");
+                "Forge installer ?????????? ??? ???????? client jar. ??????? ????? ???????.");
         }
 
         await EnsureLegacyForgeUniversalLibraryAsync(versionNode, gameDirectory, progress, cancellationToken);
@@ -4346,7 +4346,7 @@ public sealed class MinecraftLauncherService
             return;
         }
 
-        progress?.Report(new LauncherProgress("Скачиваю Forge universal jar...", 1, 2));
+        progress?.Report(new LauncherProgress("???????? Forge universal jar...", 1, 2));
         await DownloadFileIfNeededAsync(
             downloadEntry.Url,
             downloadEntry.DestinationPath,
@@ -4414,7 +4414,7 @@ public sealed class MinecraftLauncherService
             if (File.Exists(workspaceJarPath))
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(clientJarPath)
-                                          ?? throw new InvalidOperationException("Некорректный путь Forge client jar."));
+                                          ?? throw new InvalidOperationException("???????????? ???? Forge client jar."));
                 File.Copy(workspaceJarPath, clientJarPath, overwrite: true);
             }
         }
@@ -4524,7 +4524,7 @@ public sealed class MinecraftLauncherService
             return;
         }
 
-        progress?.Report(new LauncherProgress("Восстанавливаю Forge client artifacts...", 1, 2));
+        progress?.Report(new LauncherProgress("?????????????? Forge client artifacts...", 1, 2));
         var workspaceDirectory = PrepareForgeInstallerWorkspace(gameDirectory, minecraftVersionId);
         await RunForgeInstallerWithFallbackAsync(
             installerPath,
@@ -4543,7 +4543,7 @@ public sealed class MinecraftLauncherService
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(artifact.DestinationPath)
-                                      ?? throw new InvalidOperationException("Некорректный путь Forge artifact."));
+                                      ?? throw new InvalidOperationException("???????????? ???? Forge artifact."));
             File.Copy(workspacePath, artifact.DestinationPath, overwrite: true);
         }
 
@@ -4554,7 +4554,7 @@ public sealed class MinecraftLauncherService
         if (stillMissing.Length > 0)
         {
             throw new InvalidOperationException(
-                "Forge installer не создал нужные client artifacts: " + string.Join(", ", stillMissing));
+                "Forge installer ?? ?????? ?????? client artifacts: " + string.Join(", ", stillMissing));
         }
     }
 
@@ -4838,7 +4838,7 @@ public sealed class MinecraftLauncherService
         if (string.IsNullOrWhiteSpace(headlessInstallerPath) || !File.Exists(headlessInstallerPath))
         {
             throw new InvalidOperationException(
-                "Не удалось скачать ForgeInstallerHeadless. Проверь интернет или установи Forge вручную.");
+                "?? ??????? ??????? ForgeInstallerHeadless. ??????? ???????? ??? ???????? Forge ???????.");
         }
 
         var baseVersion = await ResolveVersionEntryByIdAsync(minecraftVersionId, gameDirectory, cancellationToken);
@@ -4894,7 +4894,7 @@ public sealed class MinecraftLauncherService
         catch (Exception headlessError) when (cliError is not null)
         {
             throw new InvalidOperationException(
-                $"Не удалось установить Forge для {minecraftVersionId} ни через обычный installer, ни через headless fallback.",
+                $"?? ??????? ?????????? Forge ??? {minecraftVersionId} ?? ????? ??????? installer, ?? ????? headless fallback.",
                 new AggregateException(cliError, headlessError));
         }
     }
@@ -4990,7 +4990,7 @@ public sealed class MinecraftLauncherService
                 return false;
             }
 
-            progress?.Report(new LauncherProgress("Р Р°СЃРїР°РєРѕРІС‹РІР°СЋ Forge library...", 1, 2));
+            progress?.Report(new LauncherProgress("???????????????????????? Forge library...", 1, 2));
             return ExtractForgeJarEntry(entry, destinationPath, expectedInfo, cancellationToken);
         }
         catch
@@ -5018,14 +5018,14 @@ public sealed class MinecraftLauncherService
             var lzmaEntry = FindForgeInstallerEntry(archive, "data/client.lzma", "client.lzma");
             if (lzmaEntry != null)
             {
-                progress?.Report(new LauncherProgress("Распаковываю Forge client jar...", 1, 2));
+                progress?.Report(new LauncherProgress("???????????? Forge client jar...", 1, 2));
                 return ExtractForgeLzmaEntry(lzmaEntry, clientJarPath, expectedInfo, cancellationToken);
             }
 
             var jarEntry = FindForgeInstallerEntry(archive, "data/client.jar", "client.jar");
             if (jarEntry != null)
             {
-                progress?.Report(new LauncherProgress("Распаковываю Forge client jar...", 1, 2));
+                progress?.Report(new LauncherProgress("???????????? Forge client jar...", 1, 2));
                 return ExtractForgeJarEntry(jarEntry, clientJarPath, expectedInfo, cancellationToken);
             }
         }
@@ -5071,7 +5071,7 @@ public sealed class MinecraftLauncherService
         cancellationToken.ThrowIfCancellationRequested();
 
         var destinationDirectory = Path.GetDirectoryName(destinationPath)
-                                   ?? throw new InvalidOperationException("Некорректный путь Forge client jar.");
+                                   ?? throw new InvalidOperationException("???????????? ???? Forge client jar.");
         Directory.CreateDirectory(destinationDirectory);
 
         var tempFile = destinationPath + ".tmp";
@@ -5117,7 +5117,7 @@ public sealed class MinecraftLauncherService
         cancellationToken.ThrowIfCancellationRequested();
 
         var destinationDirectory = Path.GetDirectoryName(destinationPath)
-                                   ?? throw new InvalidOperationException("Некорректный путь Forge client jar.");
+                                   ?? throw new InvalidOperationException("???????????? ???? Forge client jar.");
         Directory.CreateDirectory(destinationDirectory);
 
         var tempFile = destinationPath + ".tmp";
@@ -5355,7 +5355,7 @@ public sealed class MinecraftLauncherService
         if (!File.Exists(sourceJsonPath) || !File.Exists(sourceJarPath))
         {
             throw new InvalidOperationException(
-                $"Не найдены файлы базовой версии {minecraftVersionId}. Сначала запусти эту версию без Forge.");
+                $"?? ??????? ????? ??????? ?????? {minecraftVersionId}. ??????? ??????? ??? ?????? ??? Forge.");
         }
 
         var targetVersionDirectory = Path.Combine(workspaceGameDirectory, "versions", minecraftVersionId);
@@ -5444,7 +5444,7 @@ public sealed class MinecraftLauncherService
                     return localFallbackJar!;
                 }
 
-                throw new InvalidOperationException("Не удалось получить authlib-injector.");
+                throw new InvalidOperationException("?? ??????? ???????? authlib-injector.");
             }
 
             var destinationPath = Path.Combine(authlibDirectory, release.FileName);
@@ -5516,19 +5516,19 @@ public sealed class MinecraftLauncherService
     {
         if (string.IsNullOrWhiteSpace(options.Username))
         {
-            throw new ArgumentException("РЈРєР°Р¶Рё РЅРёРє РїРµСЂРµРґ Р·Р°РїСѓСЃРєРѕРј.", nameof(options));
+            throw new ArgumentException("?????????? ?????? ?????????? ????????????????.", nameof(options));
         }
 
         if (options.MemoryMb < 1024)
         {
-            throw new ArgumentException("РњРёРЅРёРјР°Р»СЊРЅР°СЏ РїР°РјСЏС‚СЊ РґР»СЏ Р·Р°РїСѓСЃРєР°: 1024 MB.", nameof(options));
+            throw new ArgumentException("?????????????????????? ???????????? ?????? ??????????????: 1024 MB.", nameof(options));
         }
 
         var gameDirectory = GetGameDirectory(options.Profile);
         Directory.CreateDirectory(gameDirectory);
         EnsureProfileDirectories(gameDirectory, options.Profile, options.MinecraftLanguageCode);
 
-        progress?.Report(new LauncherProgress("Скачиваю metadata версии...", 0, 1));
+        progress?.Report(new LauncherProgress("???????? metadata ??????...", 0, 1));
         using var versionMetadata = await ResolveVersionMetadataAsync(options.Version, gameDirectory, cancellationToken);
 
         var root = versionMetadata.RootElement;
@@ -5551,8 +5551,8 @@ public sealed class MinecraftLauncherService
         Directory.CreateDirectory(librariesDirectory);
         Directory.CreateDirectory(Path.Combine(assetsDirectory, "indexes"));
         Directory.CreateDirectory(Path.Combine(assetsDirectory, "objects"));
-        EnsureSufficientFreeSpace(instanceDirectory, 512L * 1024 * 1024, $"запуска версии {resolvedVersionId}");
-        EnsureSufficientFreeSpace(javaTemporaryDirectory, 512L * 1024 * 1024, $"временных файлов Java для {resolvedVersionId}");
+        EnsureSufficientFreeSpace(instanceDirectory, 512L * 1024 * 1024, $"??????? ?????? {resolvedVersionId}");
+        EnsureSufficientFreeSpace(javaTemporaryDirectory, 512L * 1024 * 1024, $"????????? ?????? Java ??? {resolvedVersionId}");
 
         await EnsureForgeClientLibraryForLaunchAsync(
             root,
@@ -5591,7 +5591,7 @@ public sealed class MinecraftLauncherService
             else
             {
                 throw new InvalidDataException(
-                    $"Р’ metadata РІРµСЂСЃРёРё '{resolvedVersionId}' РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ client download Рё РЅРµ РЅР°Р№РґРµРЅ Р»РѕРєР°Р»СЊРЅС‹Р№ jar.");
+                    $"?? metadata ???????????? '{resolvedVersionId}' ?????????????????????? client download ?? ???? ???????????? ?????????????????? jar.");
             }
         }
 
@@ -5714,7 +5714,7 @@ public sealed class MinecraftLauncherService
                                 if (!File.Exists(artifactPath))
                                 {
                                     throw new InvalidOperationException(
-                                        "Forge client jar не найден. Переустанови Forge через лаунчер.");
+                                        "Forge client jar ?? ??????. ???????????? Forge ????? ???????.");
                                 }
                             }
                             else
@@ -5873,7 +5873,7 @@ public sealed class MinecraftLauncherService
 
         if (string.IsNullOrWhiteSpace(classpath))
         {
-            throw new InvalidOperationException("Classpath пустой. Не удалось подготовить библиотеки для запуска.");
+            throw new InvalidOperationException("Classpath ??????. ?? ??????? ??????????? ?????????? ??? ???????.");
         }
 
         var replacements = BuildLaunchReplacements(
@@ -5899,7 +5899,7 @@ public sealed class MinecraftLauncherService
         {
             try
             {
-                progress?.Report(new LauncherProgress("Скачиваю authlib-injector...", total, total));
+                progress?.Report(new LauncherProgress("???????? authlib-injector...", total, total));
                 authlibInjectorPath = await EnsureAuthlibInjectorAsync(cancellationToken);
             }
             catch
@@ -5932,7 +5932,7 @@ public sealed class MinecraftLauncherService
 
         if (string.IsNullOrWhiteSpace(mainClass))
         {
-            throw new InvalidDataException("Р’ metadata РІРµСЂСЃРёРё РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ mainClass.");
+            throw new InvalidDataException("?? metadata ???????????? ?????????????????????? mainClass.");
         }
 
         var launchJavaExecutable = ResolveJavaProbeExecutable(resolvedJavaExecutable);
@@ -5978,11 +5978,11 @@ public sealed class MinecraftLauncherService
             processInfo.ArgumentList.Add(arg);
         }
 
-        progress?.Report(new LauncherProgress("Запуск Minecraft...", total, total));
+        progress?.Report(new LauncherProgress("?????? Minecraft...", total, total));
         var process = Process.Start(processInfo);
         if (process is null)
         {
-            throw new InvalidOperationException("Не удалось запустить процесс Java.");
+            throw new InvalidOperationException("?? ??????? ????????? ??????? Java.");
         }
 
         var stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
@@ -6019,7 +6019,7 @@ public sealed class MinecraftLauncherService
                     failureAnalysis))
             {
                 progress?.Report(new LauncherProgress(
-                    failureAnalysis.RepairStageText ?? "Восстанавливаю поврежденную установку...",
+                    failureAnalysis.RepairStageText ?? "?????????????? ???????????? ?????????...",
                     total,
                     total));
 
@@ -6031,19 +6031,19 @@ public sealed class MinecraftLauncherService
             }
 
             var logHint = File.Exists(latestLogPath)
-                ? $" Подробности: {latestLogPath}"
+                ? $" ???????????: {latestLogPath}"
                 : string.Empty;
             var javaLogHint = File.Exists(lastJavaStdErrPath)
                 ? $" Java stderr: {lastJavaStdErrPath}"
                 : string.Empty;
             var reasonHint = string.IsNullOrWhiteSpace(failureAnalysis.UserMessage)
                 ? string.Empty
-                : $"{Environment.NewLine}{Environment.NewLine}Причина: {failureAnalysis.UserMessage}";
+                : $"{Environment.NewLine}{Environment.NewLine}???????: {failureAnalysis.UserMessage}";
             var diagnosticHint = string.IsNullOrWhiteSpace(failureAnalysis.DiagnosticSnippet)
                 ? string.Empty
                 : $"{Environment.NewLine}{Environment.NewLine}{failureAnalysis.DiagnosticSnippet}";
             throw new InvalidOperationException(
-                $"Minecraft завершился сразу после запуска. Код: {process.ExitCode}.{reasonHint}{logHint}{javaLogHint}{diagnosticHint}");
+                $"Minecraft ?????????? ????? ????? ???????. ???: {process.ExitCode}.{reasonHint}{logHint}{javaLogHint}{diagnosticHint}");
         }
 
         return new LaunchResult(instanceDirectory, process.Id);
@@ -6056,7 +6056,7 @@ public sealed class MinecraftLauncherService
     {
         using var metadata = await DownloadVersionMetadataAsync(version, gameDirectory, cancellationToken);
         var versionNode = JsonNode.Parse(metadata.RootElement.GetRawText()) as JsonObject
-                          ?? throw new InvalidDataException($"Не удалось разобрать metadata версии '{version.Id}'.");
+                          ?? throw new InvalidDataException($"?? ??????? ????????? metadata ?????? '{version.Id}'.");
 
         var resolutionPath = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -6083,7 +6083,7 @@ public sealed class MinecraftLauncherService
         if (!resolutionPath.Add(inheritsFrom))
         {
             throw new InvalidDataException(
-                $"Обнаружена циклическая зависимость inheritsFrom: {string.Join(" -> ", resolutionPath)} -> {inheritsFrom}");
+                $"?????????? ??????????? ??????????? inheritsFrom: {string.Join(" -> ", resolutionPath)} -> {inheritsFrom}");
         }
 
         try
@@ -6091,7 +6091,7 @@ public sealed class MinecraftLauncherService
             var parentVersion = await ResolveVersionEntryByIdAsync(inheritsFrom, gameDirectory, cancellationToken);
             using var parentMetadata = await DownloadVersionMetadataAsync(parentVersion, gameDirectory, cancellationToken);
             var parentNode = JsonNode.Parse(parentMetadata.RootElement.GetRawText()) as JsonObject
-                             ?? throw new InvalidDataException($"Не удалось разобрать metadata родительской версии '{inheritsFrom}'.");
+                             ?? throw new InvalidDataException($"?? ??????? ????????? metadata ???????????? ?????? '{inheritsFrom}'.");
 
             var resolvedParentNode = await ResolveVersionMetadataNodeAsync(parentNode, gameDirectory, resolutionPath, cancellationToken);
             var merged = MergeVersionMetadataNodes(resolvedParentNode, node);
@@ -6252,7 +6252,7 @@ public sealed class MinecraftLauncherService
             return;
         }
 
-        progress?.Report(new LauncherProgress("Восстанавливаю Forge client jar...", 0, 1));
+        progress?.Report(new LauncherProgress("?????????????? Forge client jar...", 0, 1));
         await EnsureForgeClientLibraryFromInstallerAsync(
             libraryName,
             gameDirectory,
@@ -6269,7 +6269,7 @@ public sealed class MinecraftLauncherService
 
         if (!File.Exists(clientJarPath))
         {
-            throw new InvalidOperationException("Не удалось подготовить Forge client jar для запуска.");
+            throw new InvalidOperationException("?? ??????? ??????????? Forge client jar ??? ???????.");
         }
     }
 
@@ -6492,7 +6492,7 @@ public sealed class MinecraftLauncherService
     {
         if (string.IsNullOrWhiteSpace(versionId))
         {
-            throw new ArgumentException("ID версии не указан.", nameof(versionId));
+            throw new ArgumentException("ID ?????? ?? ??????.", nameof(versionId));
         }
 
         var normalizedVersionId = versionId.Trim();
@@ -6586,7 +6586,7 @@ public sealed class MinecraftLauncherService
                 sha1);
         }
 
-        throw new InvalidOperationException($"Не удалось найти metadata для версии '{normalizedVersionId}'.");
+        throw new InvalidOperationException($"?? ??????? ????? metadata ??? ?????? '{normalizedVersionId}'.");
     }
 
     private static async Task<JsonDocument> DownloadVersionMetadataAsync(
@@ -6601,7 +6601,7 @@ public sealed class MinecraftLauncherService
         var versionJsonPath = Path.Combine(versionDirectory, $"{version.Id}.json");
         if (!TryCopyVersionMetadataFromKnownSources(version, versionJsonPath))
         {
-            var downloadStage = $"Скачиваю metadata Minecraft {version.Id}...";
+            var downloadStage = $"???????? metadata Minecraft {version.Id}...";
             progress?.Report(new LauncherProgress(downloadStage, 0, 1));
             await DownloadFileIfNeededAsync(
                 version.MetadataUrl,
@@ -6626,7 +6626,7 @@ public sealed class MinecraftLauncherService
                 return true;
             }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("Некорректный путь метаданных версии."));
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("???????????? ???? ?????????? ??????."));
             File.Copy(version.LocalMetadataPath, destinationPath, overwrite: true);
             return true;
         }
@@ -6670,7 +6670,7 @@ public sealed class MinecraftLauncherService
             return true;
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("Некорректный путь метаданных версии."));
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("???????????? ???? ?????????? ??????."));
         File.Copy(sourcePath, destinationPath, overwrite: true);
         return true;
     }
@@ -6694,7 +6694,7 @@ public sealed class MinecraftLauncherService
             return true;
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РїСѓС‚СЊ РјРµС‚Р°РґР°РЅРЅС‹С… РІРµСЂСЃРёРё."));
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("???????????????????????? ???????? ???????????????????? ????????????."));
         File.Copy(sourcePath, destinationPath, overwrite: true);
         return true;
     }
@@ -6914,7 +6914,7 @@ public sealed class MinecraftLauncherService
         if (!File.Exists(fallbackAbsolutePath))
         {
             throw new InvalidOperationException(
-                "Не удалось подготовить OptiFine launchwrapper. Во встроенном jar нет launchwrapper-of, а внешний launchwrapper-2.3 тоже не найден.");
+                "?? ??????? ??????????? OptiFine launchwrapper. ?? ?????????? jar ??? launchwrapper-of, ? ??????? launchwrapper-2.3 ???? ?? ??????.");
         }
 
         return new OptiFineLaunchwrapperLibrary(
@@ -6954,7 +6954,7 @@ public sealed class MinecraftLauncherService
                 }
 
                 Directory.CreateDirectory(
-                    Path.GetDirectoryName(absolutePath) ?? throw new InvalidOperationException("Некорректный путь OptiFine launchwrapper."));
+                    Path.GetDirectoryName(absolutePath) ?? throw new InvalidOperationException("???????????? ???? OptiFine launchwrapper."));
 
                 using var source = entry.Open();
                 using var destination = File.Create(absolutePath);
@@ -7041,13 +7041,13 @@ public sealed class MinecraftLauncherService
         if (!File.Exists(installerArchivePath) || !IsOptiFinePatchArchive(installerArchivePath))
         {
             Directory.CreateDirectory(
-                Path.GetDirectoryName(installerArchivePath) ?? throw new InvalidOperationException("Некорректный путь исходного OptiFine архива."));
+                Path.GetDirectoryName(installerArchivePath) ?? throw new InvalidOperationException("???????????? ???? ????????? OptiFine ??????."));
             File.Copy(optiFineLibraryPath, installerArchivePath, overwrite: true);
         }
 
         File.Delete(optiFineLibraryPath);
 
-        progress?.Report(new LauncherProgress("Собираю patched OptiFine jar...", 0, 1));
+        progress?.Report(new LauncherProgress("??????? patched OptiFine jar...", 0, 1));
         await RunJavaMainAsync(
             javaExecutable,
             installerArchivePath,
@@ -7057,7 +7057,7 @@ public sealed class MinecraftLauncherService
 
         if (!File.Exists(optiFineLibraryPath))
         {
-            throw new InvalidOperationException("OptiFine patcher завершился без создания patched jar.");
+            throw new InvalidOperationException("OptiFine patcher ?????????? ??? ???????? patched jar.");
         }
     }
 
@@ -7097,7 +7097,7 @@ public sealed class MinecraftLauncherService
     private static string GetOptiFineInstallerArchivePath(string optiFineLibraryPath)
     {
         var directory = Path.GetDirectoryName(optiFineLibraryPath)
-                        ?? throw new InvalidOperationException("Некорректный путь OptiFine библиотеки.");
+                        ?? throw new InvalidOperationException("???????????? ???? OptiFine ??????????.");
         var fileName = Path.GetFileNameWithoutExtension(optiFineLibraryPath);
         var extension = Path.GetExtension(optiFineLibraryPath);
         return Path.Combine(directory, $"{fileName}-installer{extension}");
@@ -7111,7 +7111,7 @@ public sealed class MinecraftLauncherService
         CancellationToken cancellationToken)
     {
         var tempDirectory = ResolveLauncherJavaTemporaryDirectory(mainClass);
-        EnsureSufficientFreeSpace(tempDirectory, 512L * 1024 * 1024, $"временных файлов Java для {mainClass}");
+        EnsureSufficientFreeSpace(tempDirectory, 512L * 1024 * 1024, $"????????? ?????? Java ??? {mainClass}");
         var processInfo = new ProcessStartInfo
         {
             FileName = javaExecutable,
@@ -7131,7 +7131,7 @@ public sealed class MinecraftLauncherService
         }
 
         using var process = Process.Start(processInfo)
-                            ?? throw new InvalidOperationException($"Не удалось запустить Java процесс '{mainClass}'.");
+                            ?? throw new InvalidOperationException($"?? ??????? ????????? Java ??????? '{mainClass}'.");
 
         var stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
@@ -7153,7 +7153,7 @@ public sealed class MinecraftLauncherService
             .Trim();
 
         throw new InvalidOperationException(
-            $"Java процесс '{mainClass}' завершился с кодом {process.ExitCode}.{(string.IsNullOrWhiteSpace(errorText) ? string.Empty : Environment.NewLine + errorText)}");
+            $"Java ??????? '{mainClass}' ?????????? ? ????? {process.ExitCode}.{(string.IsNullOrWhiteSpace(errorText) ? string.Empty : Environment.NewLine + errorText)}");
     }
 
     private static async Task RunJavaJarAsync(
@@ -7163,7 +7163,7 @@ public sealed class MinecraftLauncherService
         CancellationToken cancellationToken)
     {
         var tempDirectory = ResolveLauncherJavaTemporaryDirectory(Path.GetFileNameWithoutExtension(jarPath));
-        EnsureSufficientFreeSpace(tempDirectory, 512L * 1024 * 1024, $"временных файлов Java для {Path.GetFileName(jarPath)}");
+        EnsureSufficientFreeSpace(tempDirectory, 512L * 1024 * 1024, $"????????? ?????? Java ??? {Path.GetFileName(jarPath)}");
         var processInfo = new ProcessStartInfo
         {
             FileName = javaExecutable,
@@ -7182,7 +7182,7 @@ public sealed class MinecraftLauncherService
         }
 
         using var process = Process.Start(processInfo)
-                            ?? throw new InvalidOperationException("Не удалось запустить Java процесс Forge installer.");
+                            ?? throw new InvalidOperationException("?? ??????? ????????? Java ??????? Forge installer.");
 
         var stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
@@ -7204,7 +7204,7 @@ public sealed class MinecraftLauncherService
             .Trim();
 
         throw new InvalidOperationException(
-            $"Forge installer завершился с кодом {process.ExitCode}.{(string.IsNullOrWhiteSpace(errorText) ? string.Empty : Environment.NewLine + errorText)}");
+            $"Forge installer ?????????? ? ????? {process.ExitCode}.{(string.IsNullOrWhiteSpace(errorText) ? string.Empty : Environment.NewLine + errorText)}");
     }
 
     private static bool PathsReferToSameFile(string firstPath, string secondPath)
@@ -7283,7 +7283,7 @@ public sealed class MinecraftLauncherService
             return true;
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("Некорректный путь jar файла версии."));
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("???????????? ???? jar ????? ??????."));
         File.Copy(sourcePath, destinationPath, overwrite: true);
         return true;
     }
@@ -7313,7 +7313,7 @@ public sealed class MinecraftLauncherService
             return true;
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РїСѓС‚СЊ jar С„Р°Р№Р»Р° РІРµСЂСЃРёРё."));
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("???????????????????????? ???????? jar ?????????? ????????????."));
         File.Copy(sourcePath, destinationPath, overwrite: true);
         return true;
     }
@@ -9350,7 +9350,7 @@ public sealed class MinecraftLauncherService
 
         if (isExplicitPath && !File.Exists(normalized))
         {
-            throw new FileNotFoundException("Файл java не найден.", normalized);
+            throw new FileNotFoundException("???? java ?? ??????.", normalized);
         }
 
         if (RequiresLegacyJava(versionId))
@@ -9391,7 +9391,7 @@ public sealed class MinecraftLauncherService
         var requiredMajor = ResolveRequiredJavaMajor(versionRoot, versionId);
         if (javaExecutable == "download")
         {
-            var downloadJavaStage = $"Скачиваю Java {requiredMajor} для версии {versionId}...";
+            var downloadJavaStage = $"???????? Java {requiredMajor} ??? ?????? {versionId}...";
             progress?.Report(new LauncherProgress(downloadJavaStage, 0, 1));
             return await EnsureDownloadedJavaRuntimeAsync(
                 requiredMajor,
@@ -9432,7 +9432,7 @@ public sealed class MinecraftLauncherService
             }
         }
 
-        var javaStage = $"Скачиваю Java {requiredMajor} для версии {versionId}...";
+        var javaStage = $"???????? Java {requiredMajor} ??? ?????? {versionId}...";
         progress?.Report(new LauncherProgress(javaStage, 0, 1));
         var downloaded = await EnsureDownloadedJavaRuntimeAsync(
             requiredMajor,
@@ -9631,7 +9631,7 @@ public sealed class MinecraftLauncherService
             }
 
             Directory.CreateDirectory(runtimesRoot);
-            EnsureSufficientFreeSpace(runtimesRoot, 768L * 1024 * 1024, $"установки Java {majorVersion}");
+            EnsureSufficientFreeSpace(runtimesRoot, 768L * 1024 * 1024, $"????????? Java {majorVersion}");
 
             var archivePath = Path.Combine(runtimesRoot, $"{runtimeId}.zip");
             var extractDirectory = Path.Combine(runtimesRoot, $"{runtimeId}.extract");
@@ -9656,7 +9656,7 @@ public sealed class MinecraftLauncherService
                 var downloaded = FindJavaExecutableInDirectory(runtimeDirectory, majorVersion);
                 if (string.IsNullOrWhiteSpace(downloaded))
                 {
-                    throw new InvalidDataException($"Не удалось найти javaw.exe после установки Java {majorVersion}.");
+                    throw new InvalidDataException($"?? ??????? ????? javaw.exe ????? ????????? Java {majorVersion}.");
                 }
 
                 return downloaded;
@@ -9710,7 +9710,7 @@ public sealed class MinecraftLauncherService
         }
 
         throw new IOException(
-            $"Не удалось скачать Java {majorVersion} для архитектуры {arch}.",
+            $"?? ??????? ??????? Java {majorVersion} ??? ??????????? {arch}.",
             lastError);
     }
 
@@ -10031,12 +10031,12 @@ public sealed class MinecraftLauncherService
     {
         if (fileId <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(fileId), "Некорректный идентификатор файла CurseForge.");
+            throw new ArgumentOutOfRangeException(nameof(fileId), "???????????? ????????????? ????? CurseForge.");
         }
 
         if (string.IsNullOrWhiteSpace(fileName))
         {
-            throw new ArgumentException("Имя файла CurseForge не указано.", nameof(fileName));
+            throw new ArgumentException("??? ????? CurseForge ?? ???????.", nameof(fileName));
         }
 
         var folderA = fileId / 1000;
@@ -10908,13 +10908,13 @@ public sealed class MinecraftLauncherService
             progress.Report(progressValue);
         }
 
-        progress?.Report(new LauncherProgress($"Скачивание файлов (0/{total})...", 0, total));
+        progress?.Report(new LauncherProgress($"?????????? ?????? (0/{total})...", 0, total));
 
         using var semaphore = new SemaphoreSlim(VersionFileDownloadConcurrency, VersionFileDownloadConcurrency);
         var tasks = queue.Select(async (item, index) =>
         {
             await semaphore.WaitAsync(cancellationToken);
-            var stage = $"Скачивание ({index + 1}/{total}): {item.Label}";
+            var stage = $"?????????? ({index + 1}/{total}): {item.Label}";
 
             var finished = false;
 
@@ -10945,7 +10945,7 @@ public sealed class MinecraftLauncherService
             }
             catch
             {
-                ReportProgress("Ошибка скачивания: " + item.Label, index, 0, force: true);
+                ReportProgress("?????? ??????????: " + item.Label, index, 0, force: true);
                 throw;
             }
             finally
@@ -10960,7 +10960,7 @@ public sealed class MinecraftLauncherService
                     }
                     lastProgressTick = Environment.TickCount64;
                     progressValue = new LauncherProgress(
-                        $"Скачивание файлов ({completed}/{total})...",
+                        $"?????????? ?????? ({completed}/{total})...",
                         completed + fractions.Sum(),
                         total);
                 }
@@ -10971,7 +10971,7 @@ public sealed class MinecraftLauncherService
         });
 
         await Task.WhenAll(tasks);
-        progress?.Report(new LauncherProgress($"Скачивание файлов ({total}/{total}) завершено.", total, total));
+        progress?.Report(new LauncherProgress($"?????????? ?????? ({total}/{total}) ?????????.", total, total));
         return Volatile.Read(ref downloadedAny) != 0;
     }
 
@@ -11099,7 +11099,7 @@ public sealed class MinecraftLauncherService
             }
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("РќРµРІР°Р»РёРґРЅС‹Р№ РїСѓС‚СЊ РЅР°Р·РЅР°С‡РµРЅРёСЏ."));
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("???????????????????? ???????? ????????????????????."));
 
         var tempFile = destinationPath + ".tmp";
 
@@ -11119,7 +11119,7 @@ public sealed class MinecraftLauncherService
             if (!downloadedHash.Equals(expectedSha1, StringComparison.OrdinalIgnoreCase))
             {
                 File.Delete(tempFile);
-                throw new InvalidDataException($"SHA1 РЅРµ СЃРѕРІРїР°Р» РґР»СЏ С„Р°Р№Р»Р°: {destinationPath}");
+                throw new InvalidDataException($"SHA1 ???? ???????????? ?????? ??????????: {destinationPath}");
             }
         }
 
@@ -11162,7 +11162,7 @@ public sealed class MinecraftLauncherService
             }
         }
 
-        throw lastError ?? new IOException($"Не удалось скачать файл после {maxAttempts} попыток: {url}");
+        throw lastError ?? new IOException($"?? ??????? ??????? ???? ????? {maxAttempts} ???????: {url}");
     }
 
     private static async Task<bool> DownloadFileWithSha256IfNeededAsync(
@@ -11186,7 +11186,7 @@ public sealed class MinecraftLauncherService
             }
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("Некорректный путь назначения."));
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("???????????? ???? ??????????."));
         var tempFile = destinationPath + ".tmp";
 
         var downloadAttempt = await GetDownloadResponseWithFallbackAsync(url, cancellationToken);
@@ -11205,7 +11205,7 @@ public sealed class MinecraftLauncherService
             if (!downloadedHash.Equals(expectedSha256, StringComparison.OrdinalIgnoreCase))
             {
                 File.Delete(tempFile);
-                throw new InvalidDataException($"SHA256 не совпал для файла: {destinationPath}");
+                throw new InvalidDataException($"SHA256 ?? ?????? ??? ?????: {destinationPath}");
             }
         }
 
@@ -11277,8 +11277,8 @@ public sealed class MinecraftLauncherService
 
         var statusText = lastStatus.HasValue ? $"{(int)lastStatus.Value} {lastStatus.Value}" : "unknown";
         throw new HttpRequestException(
-            $"Не удалось скачать файл. Статус: {statusText}. URL: {url}. " +
-            $"Проверено: {string.Join(" -> ", attempted)}",
+            $"?? ??????? ??????? ????. ??????: {statusText}. URL: {url}. " +
+            $"?????????: {string.Join(" -> ", attempted)}",
             lastError);
     }
 
@@ -11821,7 +11821,7 @@ public sealed class MinecraftLauncherService
         var destinationPath = CombineWithRoot(librariesDirectory, relativePath);
         if (!PathsReferToSameFile(sourcePath, destinationPath))
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("Некорректный путь Ely authlib."));
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("???????????? ???? Ely authlib."));
             File.Copy(sourcePath, destinationPath, overwrite: true);
         }
 
@@ -12138,26 +12138,26 @@ public sealed class MinecraftLauncherService
                 "Could not find or load main class",
                 "ClassNotFoundException",
                 "NoClassDefFoundError",
-                "forge client jar не найден",
+                "forge client jar ?? ??????",
                 "Error opening zip file",
                 "Unable to access jarfile",
                 "The system cannot find the file specified"))
         {
-            userMessage = "Похоже, версия или её библиотеки скачались/собрались с ошибкой. Лаунчер попробует пересобрать установку.";
+            userMessage = "??????, ?????? ??? ?? ?????????? ?????????/????????? ? ???????. ??????? ????????? ??????????? ?????????.";
             shouldRepair = true;
             resetVersionArtifacts = true;
-            repairStageText = "Восстанавливаю файлы версии...";
+            repairStageText = "?????????????? ????? ??????...";
         }
         else if (LaunchLogContainsAnyToken(
                      combined,
                      "CAFixer is not available",
                      "com/turikhay/caf/util/Logger"))
         {
-            userMessage = "Для старой версии не хватило библиотек совместимости. Лаунчер попробует восстановить их автоматически.";
+            userMessage = "??? ?????? ?????? ?? ??????? ????????? ?????????????. ??????? ????????? ???????????? ?? ?????????????.";
             shouldRepair = true;
             resetVersionArtifacts = true;
             resetCompatibilityLibraries = true;
-            repairStageText = "Восстанавливаю библиотеки совместимости...";
+            repairStageText = "?????????????? ?????????? ?????????????...";
         }
         else if (LaunchLogContainsAnyToken(
                      combined,
@@ -12165,10 +12165,10 @@ public sealed class MinecraftLauncherService
                      "has been compiled by a more recent version",
                      "A JNI error has occurred"))
         {
-            userMessage = "Для этой версии была выбрана неподходящая Java. Лаунчер попробует заново подготовить Java runtime.";
+            userMessage = "??? ???? ?????? ???? ??????? ???????????? Java. ??????? ????????? ?????? ??????????? Java runtime.";
             shouldRepair = true;
             resetJavaRuntime = true;
-            repairStageText = "Переустанавливаю Java runtime...";
+            repairStageText = "???????????????? Java runtime...";
         }
         else if (LaunchLogContainsAnyToken(
                      combined,
@@ -12176,17 +12176,17 @@ public sealed class MinecraftLauncherService
                      "Invalid maximum heap size",
                      "Could not create the Java Virtual Machine"))
         {
-            userMessage = "Запуск сорвался из-за Java или слишком агрессивных настроек памяти.";
+            userMessage = "?????? ???????? ??-?? Java ??? ??????? ??????????? ???????? ??????.";
             shouldRepair = true;
             resetJavaRuntime = true;
-            repairStageText = "Чиню Java и настройки запуска...";
+            repairStageText = "???? Java ? ????????? ???????...";
         }
         else if (LaunchLogContainsAnyToken(
                      combined,
                      "Scoreboard.func_96511_d",
                      "STeamsPacket"))
         {
-            userMessage = $"У {resolvedVersionId} с некоторыми серверами есть известный legacy-краш по scoreboard/team packets.";
+            userMessage = $"? {resolvedVersionId} ? ?????????? ????????? ???? ????????? legacy-???? ?? scoreboard/team packets.";
         }
         else if (LaunchLogContainsAnyToken(
                      combined,
@@ -12194,13 +12194,13 @@ public sealed class MinecraftLauncherService
                      "Failed to read value Internal Server Error",
                      "Failed to fetch metadata: java.net.ConnectException"))
         {
-            userMessage = "Сервис авторизации, скинов или bridge-метаданных временно не ответил.";
+            userMessage = "?????? ???????????, ?????? ??? bridge-?????????? ???????? ?? ???????.";
         }
         else if (LaunchLogContainsAnyToken(
                      combined,
                      "Could not decode textures payload"))
         {
-            userMessage = "Сервер прислал битый payload текстур NPC. Это уже игровая ошибка на стороне сервера.";
+            userMessage = "?????? ??????? ????? payload ??????? NPC. ??? ??? ??????? ?????? ?? ??????? ???????.";
         }
 
         return new ImmediateLaunchFailureAnalysis(
@@ -12336,7 +12336,7 @@ public sealed class MinecraftLauncherService
             return null;
         }
 
-        return "Последние строки:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
+        return "????????? ??????:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
     }
 
     private static bool LaunchLogContainsAnyToken(string? input, params string[] tokens)
@@ -12551,7 +12551,7 @@ public sealed class MinecraftLauncherService
     {
         if (string.IsNullOrWhiteSpace(minecraftVersionId))
         {
-            throw new ArgumentException("Версия Minecraft не указана.", nameof(minecraftVersionId));
+            throw new ArgumentException("?????? Minecraft ?? ???????.", nameof(minecraftVersionId));
         }
 
         return minecraftVersionId.Trim();
@@ -12960,7 +12960,7 @@ public sealed class MinecraftLauncherService
                 continue;
             }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("РќРµРІР°Р»РёРґРЅС‹Р№ РїСѓС‚СЊ Р±РёР±Р»РёРѕС‚РµРєРё."));
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? throw new InvalidOperationException("???????????????????? ???????? ????????????????????."));
             File.Copy(sourcePath, destinationPath, overwrite: true);
             return true;
         }
@@ -13092,34 +13092,9 @@ public sealed class MinecraftLauncherService
 
     private static string ResolveBaseStorageDirectory()
     {
-        var candidates = new List<string>();
-
-        candidates.Add(Path.Combine(AppContext.BaseDirectory, "GameData"));
-        candidates.Add(Path.Combine(LauncherDataPaths.GetPreferredDataDirectory(), "GameData"));
-
-        var localApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (!string.IsNullOrWhiteSpace(localApplicationData))
-        {
-            candidates.Add(Path.Combine(localApplicationData, "CheatCraftLauncherData"));
-        }
-
-        candidates.Add(Path.Combine(Path.GetTempPath(), "CheatCraftLauncherData"));
-
-        var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-        foreach (var candidate in candidates.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(comparer))
-        {
-            try
-            {
-                Directory.CreateDirectory(candidate);
-                return candidate;
-            }
-            catch
-            {
-                // Fallback when the launcher folder is read-only.
-            }
-        }
-
-        throw new IOException("Не удалось подготовить папку данных лаунчера.");
+        var minecraftDirectory = Path.GetFullPath(PlatformPaths.MinecraftDirectory);
+        return Directory.GetParent(minecraftDirectory)?.FullName
+               ?? throw new IOException("?? ??????? ?????????? ????? ??????? ?????? ????????.");
     }
 
     private static string SanitizePathSegment(string value)
@@ -13323,7 +13298,7 @@ public sealed class MinecraftLauncherService
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(junctionPath) ?? throw new InvalidOperationException("Некорректный путь ссылки на saves."));
+            Directory.CreateDirectory(Path.GetDirectoryName(junctionPath) ?? throw new InvalidOperationException("???????????? ???? ?????? ?? saves."));
 
             var process = Process.Start(new ProcessStartInfo
             {
@@ -13469,7 +13444,7 @@ public sealed class MinecraftLauncherService
 
             if (string.IsNullOrWhiteSpace(url))
             {
-                throw new InvalidDataException($"Р’ metadata РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ URL РґР»СЏ С„Р°Р№Р»Р°: {destinationPath}");
+                throw new InvalidDataException($"?? metadata ?????????????????????? URL ?????? ??????????: {destinationPath}");
             }
 
             return new DownloadEntry(url, destinationPath, sha1, label);
