@@ -171,16 +171,21 @@ function App() {
       }, 500);
     };
 
+    const onWindowResize = () => {
+      window.dispatchEvent(new Event('vesper-layout-change'));
+      publishWindowSize();
+    };
+
     // Attach listener only after window has fully settled to avoid initial mount sizing glitches
     const settleTimer = window.setTimeout(() => {
       initialLoad = false;
-      window.addEventListener('resize', publishWindowSize);
+      window.addEventListener('resize', onWindowResize);
     }, 2500);
 
     return () => {
       window.clearTimeout(settleTimer);
       window.clearTimeout(timeoutId);
-      window.removeEventListener('resize', publishWindowSize);
+      window.removeEventListener('resize', onWindowResize);
     };
   }, [loadingState]);
 
@@ -875,9 +880,10 @@ function App() {
                         rawStatus.includes('background.') ||
                         rawStatus.includes('shell.') ||
                         rawStatus.includes('main.') ||
-                        rawStatus.includes('сборки для разработки')
-                          ? 'Готов к запуску'
-                          : rawStatus || 'Готов к запуску';
+                        rawStatus.includes('сборки для разработки') ||
+                        rawStatus === 'Готов к запуску'
+                          ? ''
+                          : rawStatus;
                       const rawProgress = String(main.progressText || hostSnapshot?.update?.detailMessage || '').trim();
                       const displayProgress =
                         rawProgress.includes('host.') ||
@@ -890,11 +896,12 @@ function App() {
                       const showProgressBar = isVersionOperationActive || isProgressIndeterminate || (progressPercent > 0 && progressPercent < 100);
                       const langCode = String(launcher?.settings?.minecraftLanguageCode || navigator.language || 'ru').toLowerCase();
                       const newsButtonLabel = langCode.startsWith('ru') || langCode === 'auto' ? 'Новости' : 'NEWS';
+                      const shouldShowStatus = (showProgressBar || runtimeError || isVersionOperationActive) && !!displayStatus;
 
                       return (
                         <>
-                          <p className="status-text">{displayStatus}</p>
-                          {displayProgress ? <p className="progress-text">{displayProgress}</p> : null}
+                          {shouldShowStatus ? <p className="status-text">{displayStatus}</p> : null}
+                          {showProgressBar && displayProgress ? <p className="progress-text">{displayProgress}</p> : null}
                           {showProgressBar ? (
                             <div className="classic-progress">
                               <div className={`classic-progress-fill ${isProgressIndeterminate ? 'indeterminate' : ''}`} style={progressFillStyle} />

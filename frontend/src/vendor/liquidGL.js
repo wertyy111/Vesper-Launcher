@@ -116,30 +116,28 @@
       };
       window.addEventListener("scroll", onScroll, { passive: true });
 
-      const onResize = debounce(() => {
-        if (this._capturing || this._isScrolling) return;
+      let resizeRaf = 0;
+      const onResize = () => {
+        if (this._isScrolling) return;
 
         if (window.visualViewport && window.visualViewport.scale !== 1) {
           return;
         }
 
-        this._dynamicNodes.forEach((node) => {
-          const meta = this._dynMeta.get(node.el);
-          if (meta) {
-            meta.needsRecapture = true;
-            meta.prevDrawRect = null;
-            meta.lastCapture = null;
-          }
+        cancelAnimationFrame(resizeRaf);
+        resizeRaf = requestAnimationFrame(() => {
+          this._resizeCanvas();
+          this.lenses.forEach((l) => l.updateMetrics(true));
+          this._dirty = true;
+          this.render();
+          this.captureSnapshot();
         });
-
-        this._resizeCanvas();
-        this.lenses.forEach((l) => l.updateMetrics());
-        this.captureSnapshot();
-      }, 250);
+      };
       window.addEventListener("resize", onResize, { passive: true });
       window.addEventListener(
         "vesper-layout-change",
         () => {
+          this._resizeCanvas();
           this.lenses.forEach((l) => l.updateMetrics(true));
           this._dirty = true;
           this.render();
@@ -409,11 +407,17 @@
     /* ----------------------------- */
     _resizeCanvas() {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      this.canvas.width = innerWidth * dpr;
-      this.canvas.height = innerHeight * dpr;
-      this.canvas.style.width = `${innerWidth}px`;
-      this.canvas.style.height = `${innerHeight}px`;
-      this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const targetW = Math.round(w * dpr);
+      const targetH = Math.round(h * dpr);
+      if (this.canvas.width !== targetW || this.canvas.height !== targetH) {
+        this.canvas.width = targetW;
+        this.canvas.height = targetH;
+        this.canvas.style.width = `${w}px`;
+        this.canvas.style.height = `${h}px`;
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      }
     }
 
     /* ----------------------------- */
@@ -1507,15 +1511,23 @@
     /* ----------------------------- */
     updateMetrics(force = false) {
       if (!this.el || !this.el.isConnected) return;
-      if (!force && !this._dirty && this.rectPx) {
-        return;
-      }
-      this._dirty = false;
-
       const rect =
         this._mirrorActive && this._baseRect
           ? this._baseRect
           : this.el.getBoundingClientRect();
+
+      if (
+        !force &&
+        !this._dirty &&
+        this.rectPx &&
+        this.rectPx.left === rect.left &&
+        this.rectPx.top === rect.top &&
+        this.rectPx.width === rect.width &&
+        this.rectPx.height === rect.height
+      ) {
+        return;
+      }
+      this._dirty = false;
 
       this.rectPx = {
         left: rect.left,
