@@ -43,6 +43,8 @@ type LauncherSnapshot struct {
 type UpdatesSnapshot struct {
 	IsAvailable      bool    `json:"isAvailable"`
 	Version          string  `json:"version"`
+	Title            string  `json:"title,omitempty"`
+	ReleaseNotes     string  `json:"releaseNotes,omitempty"`
 	UsesDelta        bool    `json:"usesDelta"`
 	DeltaCount       int     `json:"deltaCount"`
 	DownloadBytes    int64   `json:"downloadBytes"`
@@ -117,9 +119,13 @@ type ModItem struct {
 	GameVersions []string `json:"gameVersions"`
 	Loaders      []string `json:"loaders"`
 	IsEnabled    bool     `json:"isEnabled"`
+	IsInstalled  bool     `json:"isInstalled"`
+	CanInstall   bool     `json:"canInstall"`
+	ActionText   string   `json:"actionText"`
 }
 
 type ModsSnapshot struct {
+	Provider         string    `json:"provider"`
 	Items            []ModItem `json:"items"`
 	SearchQuery      string    `json:"searchQuery"`
 	SelectedCategory string    `json:"selectedCategory"`
@@ -133,13 +139,17 @@ type FriendEntry struct {
 	AvatarUrl string `json:"avatarUrl"`
 	Status    string `json:"status"`
 	GameInfo  string `json:"gameInfo"`
+	IsOnline  bool   `json:"isOnline"`
+	Server    string `json:"server"`
 }
 
 type FriendRequest struct {
 	ID        string `json:"id"`
 	FromUser  string `json:"fromUser"`
+	Sender    string `json:"sender"`
 	AvatarUrl string `json:"avatarUrl"`
 	CreatedAt string `json:"createdAt"`
+	SentTime  string `json:"sentTime"`
 }
 
 type FriendsSnapshot struct {

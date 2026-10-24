@@ -28,28 +28,19 @@ type LaunchOptions struct {
 func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 	mcDir := platform.GetMinecraftDir()
 	versionsDir := filepath.Join(mcDir, "versions", opts.VersionID)
-	versionJsonPath := filepath.Join(versionsDir, opts.VersionID+".json")
 
-	if opts.OnProgress != nil {
-		opts.OnProgress(10, "Загрузка конфигурации версии...")
-	}
-
-	pkg, err := LoadVersionPackage(opts.VersionID, "")
+	// 1. Ensure version and all dependencies (libraries, assets, client jar) are installed
+	pkg, err := EnsureVersionInstalled(opts.VersionID, opts.OnProgress)
 	if err != nil {
-		// Fallback: check if it exists in bundled
-		bundledPath := filepath.Join("bundled", "BundledVersions", opts.VersionID, opts.VersionID+".json")
-		if b, errRead := os.ReadFile(bundledPath); errRead == nil {
-			_ = os.MkdirAll(versionsDir, 0755)
-			_ = os.WriteFile(versionJsonPath, b, 0644)
-			pkg, err = LoadVersionPackage(opts.VersionID, "")
-		}
+		return nil, fmt.Errorf("failed to prepare version %s: %w", opts.VersionID, err)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to load version package for %s: %w", opts.VersionID, err)
+	var parentPkg *VersionPackage
+	if pkg.InheritsFrom != "" {
+		parentPkg, _ = LoadVersionPackage(pkg.InheritsFrom, "")
 	}
 
-	// 1. Locate Java runtime
+	// 2. Locate Java runtime
 	javaPath := opts.CustomJava
 	if javaPath == "" {
 		runtimes := java.DetectRuntimes()
@@ -57,64 +48,91 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 	}
 
 	if opts.OnProgress != nil {
-		opts.OnProgress(30, "Проверка библиотек и natives...")
+		opts.OnProgress(85, "Сборка ClassPath и окружения...")
 	}
 
-	// 2. Collect libraries and natives
+	// 3. Collect libraries and natives
 	var libPaths []string
 	librariesDir := filepath.Join(mcDir, "libraries")
 	nativesDir := filepath.Join(versionsDir, "natives")
-	_ = os.MkdirAll(nativesDir, 0755)
 
-	currentOS := getCurrentOSName()
-
-	for _, lib := range pkg.Libraries {
-		if !CheckRules(lib.Rules) {
-			continue
-		}
-
-		if lib.Downloads.Artifact != nil && lib.Downloads.Artifact.Path != "" {
-			fullPath := filepath.Join(librariesDir, lib.Downloads.Artifact.Path)
-			if _, err := os.Stat(fullPath); err == nil {
-				libPaths = append(libPaths, fullPath)
+	seenLibs := make(map[string]bool)
+	collectLibraries := func(libs []LibraryEntry) {
+		for _, lib := range libs {
+			if !CheckRules(lib.Rules) {
+				continue
 			}
-		}
 
-		// Check natives classifier
-		if lib.Natives != nil {
-			classifierKey := lib.Natives[currentOS]
-			if classifierKey != "" && lib.Downloads.Classifiers != nil {
-				if artifact, ok := lib.Downloads.Classifiers[classifierKey]; ok && artifact.Path != "" {
-					nativeJarPath := filepath.Join(librariesDir, artifact.Path)
-					if _, err := os.Stat(nativeJarPath); err == nil {
-						_ = ExtractNatives(nativeJarPath, nativesDir)
-					}
+			if lib.Downloads.Artifact != nil && lib.Downloads.Artifact.Path != "" {
+				fullPath := filepath.Join(librariesDir, lib.Downloads.Artifact.Path)
+				if _, err := os.Stat(fullPath); err == nil && !seenLibs[fullPath] {
+					seenLibs[fullPath] = true
+					libPaths = append(libPaths, fullPath)
 				}
 			}
 		}
 	}
 
-	// 3. Client JAR
-	clientJar := filepath.Join(versionsDir, opts.VersionID+".jar")
+	collectLibraries(pkg.Libraries)
+	if parentPkg != nil {
+		collectLibraries(parentPkg.Libraries)
+	}
 
-	// 4. Classpath
+	// Also append any bundled libraries if on disk and not yet included
+	bundledLibsDir := filepath.Join("bundled", "BundledLibraries")
+	_ = filepath.Walk(bundledLibsDir, func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() && strings.HasSuffix(info.Name(), ".jar") {
+			rel, _ := filepath.Rel(bundledLibsDir, path)
+			installedLibPath := filepath.Join(librariesDir, rel)
+			if _, statErr := os.Stat(installedLibPath); statErr == nil && !seenLibs[installedLibPath] {
+				seenLibs[installedLibPath] = true
+				libPaths = append(libPaths, installedLibPath)
+			}
+		}
+		return nil
+	})
+
+	// 4. Client JAR
+	clientJar := filepath.Join(versionsDir, opts.VersionID+".jar")
+	if _, err := os.Stat(clientJar); os.IsNotExist(err) && parentPkg != nil {
+		parentJar := filepath.Join(mcDir, "versions", parentPkg.ID, parentPkg.ID+".jar")
+		if _, errP := os.Stat(parentJar); errP == nil {
+			clientJar = parentJar
+		}
+	}
+
+	// 5. Classpath
 	classpath := BuildClasspath(libPaths, clientJar)
 
 	if opts.OnProgress != nil {
-		opts.OnProgress(80, "Формирование аргументов запуска...")
+		opts.OnProgress(90, "Формирование аргументов запуска...")
 	}
 
-	// 5. Auth profile
+	// 6. Auth profile
 	profile := auth.CreateOfflineProfile(opts.Nickname)
 
-	// 6. Build Context
+	// 7. Assets resolution
 	assetsDir := filepath.Join(mcDir, "assets")
 	assetIndex := pkg.Assets
 	if assetIndex == "" && pkg.AssetIndex != nil {
 		assetIndex = pkg.AssetIndex.ID
 	}
+	if assetIndex == "" && parentPkg != nil {
+		assetIndex = parentPkg.Assets
+		if assetIndex == "" && parentPkg.AssetIndex != nil {
+			assetIndex = parentPkg.AssetIndex.ID
+		}
+	}
 	if assetIndex == "" {
 		assetIndex = "legacy"
+	}
+
+	mainClass := pkg.MainClass
+	if mainClass == "" && parentPkg != nil {
+		mainClass = parentPkg.MainClass
+	}
+	if mainClass == "" {
+		mainClass = "net.minecraft.client.main.Main"
 	}
 
 	ctx := LaunchContext{
@@ -122,7 +140,7 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 		VersionID:    opts.VersionID,
 		NativesDir:   nativesDir,
 		Classpath:    classpath,
-		MainClass:    pkg.MainClass,
+		MainClass:    mainClass,
 		Username:     profile.Username,
 		UUID:         profile.UUID,
 		AccessToken:  profile.AccessToken,
@@ -134,12 +152,12 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 		CustomJvm:    opts.CustomJvm,
 	}
 
-	if ctx.MainClass == "" {
-		ctx.MainClass = "net.minecraft.client.main.Main"
-	}
-
 	jvmArgs := BuildJvmArguments(ctx)
-	gameArgs := BuildGameArguments(ctx, pkg.MinecraftArguments)
+	mcArgs := pkg.MinecraftArguments
+	if mcArgs == "" && parentPkg != nil {
+		mcArgs = parentPkg.MinecraftArguments
+	}
+	gameArgs := BuildGameArguments(ctx, mcArgs)
 
 	var finalArgs []string
 	finalArgs = append(finalArgs, jvmArgs...)

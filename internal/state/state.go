@@ -37,10 +37,13 @@ type LauncherState struct {
 	CurrentSkinUrl    string
 	SearchQuery       string
 	SelectedCategory  string
+	ModProvider       string
+	IsCatalogLoading  bool
 	ModItems          []models.ModItem
 	Versions          []models.VersionOption
 	Friends           []models.FriendEntry
 	FriendRequests    []models.FriendRequest
+	Updates           models.UpdatesSnapshot
 }
 
 func NewLauncherState() *LauncherState {
@@ -54,6 +57,11 @@ func NewLauncherState() *LauncherState {
 		LanguageCode:      "ru_ru",
 		CurrentSkinUrl:    "/assets/steve.png",
 		SelectedCategory:  "Моды",
+		ModProvider:       "modrinth",
+		Updates: models.UpdatesSnapshot{
+			IsAvailable: false,
+			Version:     "1.0.65",
+		},
 		Versions: []models.VersionOption{
 			{Key: "1.21.4", DisplayName: "1.21.4 - ванильная", Category: "release", IsInstalled: true},
 			{Key: "1.20.4", DisplayName: "1.20.4 - ванильная", Category: "release", IsInstalled: false},
@@ -117,10 +125,7 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 			CanAccessFriends:   true,
 			NotificationsCount: len(s.FriendRequests),
 			Notifications:      []map[string]any{},
-			Updates: models.UpdatesSnapshot{
-				IsAvailable: false,
-				Version:     "1.0.65",
-			},
+			Updates: s.Updates,
 			Theme: models.ThemeSnapshot{
 				BackgroundUrl: s.CurrentBgUrl,
 				LogoUrl:       "/assets/vesper-logo.png",
@@ -159,10 +164,11 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 				CurrentBgUrl: s.CurrentBgUrl,
 			},
 			Mods: models.ModsSnapshot{
+				Provider:         s.ModProvider,
 				Items:            s.ModItems,
 				SearchQuery:      s.SearchQuery,
 				SelectedCategory: s.SelectedCategory,
-				IsCatalogLoading: false,
+				IsCatalogLoading: s.IsCatalogLoading,
 				CatalogSummary:   "Популярные модификации для Minecraft",
 			},
 			Friends: models.FriendsSnapshot{
@@ -292,3 +298,49 @@ func (s *LauncherState) Load() {
 		}
 	}
 }
+
+func (s *LauncherState) SetVersionCatalog(versions []models.VersionOption) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Versions = versions
+}
+
+func (s *LauncherState) SetMods(items []models.ModItem, query, category, provider string, loading bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ModItems = items
+	s.SearchQuery = query
+	s.SelectedCategory = category
+	if provider != "" {
+		s.ModProvider = provider
+	}
+	s.IsCatalogLoading = loading
+}
+
+func (s *LauncherState) SetFriends(friends []models.FriendEntry, requests []models.FriendRequest) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Friends = friends
+	s.FriendRequests = requests
+}
+
+func (s *LauncherState) SetUpdates(up models.UpdatesSnapshot) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Updates = up
+}
+
+func (s *LauncherState) SetAuth(hasAuth bool, accountType, nick, avatar string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.HasAccount = hasAuth
+	s.AccountType = accountType
+	if nick != "" {
+		s.Nickname = nick
+	}
+	if avatar != "" {
+		s.AvatarUrl = avatar
+	}
+	s.Save()
+}
+
