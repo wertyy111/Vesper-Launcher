@@ -2,19 +2,9 @@ import { photinoBridge } from '../../bridge';
 import type { PanelRenderProps } from '../../types';
 import { PanelHeader } from '../common/PanelHeader';
 
-const getDynamicBackgroundUrl = () => {
-  const hour = new Date().getHours();
-  if (hour >= 6 && hour < 12) return '/launcher-assets/bg-sunrise.png';
-  if (hour >= 12 && hour < 18) return '/launcher-assets/bg-day.png';
-  if (hour >= 18 && hour < 22) return '/launcher-assets/bg-sunset.png';
-  return '/launcher-assets/bg-night.png';
-};
-
 export function BackgroundPanel({ launcher }: PanelRenderProps) {
   const background = launcher.background;
   const items = (background.items ?? []) as Array<Record<string, any>>;
-  const isProceduralActive = !background.appliedBackgroundUrl;
-  const currentDynamicBg = getDynamicBackgroundUrl();
 
   return (
     <>
@@ -33,31 +23,7 @@ export function BackgroundPanel({ launcher }: PanelRenderProps) {
         </div>
 
         <div className="background-catalog-grid">
-          {/* Top-left: Standard procedural background (represented by dynamic sunrise/day/sunset/night bg) */}
-          <div
-            className={`background-catalog-item ${isProceduralActive ? 'selected' : ''}`}
-            onClick={() => photinoBridge.sendCommand('background.reset')}
-            role="button"
-            tabIndex={0}
-          >
-            <img src={currentDynamicBg} alt="Standard procedural background" />
-            
-            {/* Clock icon badge for dynamic time of day changing */}
-            <div className="dynamic-time-badge" title="Смена фона по времени суток">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-              <span>Динамический</span>
-            </div>
-
-            {isProceduralActive && (
-              <div className="selected-badge">Выбрано</div>
-            )}
-            <span>Standard procedural background</span>
-          </div>
-
-          {/* Custom backgrounds */}
+          {/* Custom & preset backgrounds */}
           {items.map((item) => (
             <div
               key={String(item.fileName)}
@@ -66,11 +32,7 @@ export function BackgroundPanel({ launcher }: PanelRenderProps) {
               role="button"
               tabIndex={0}
             >
-              {item.url ? (
-                <img src={item.url} alt={String(item.label)} />
-              ) : (
-                <img src={currentDynamicBg} alt={String(item.label || item.fileName)} />
-              )}
+              <img src={item.url || '/assets/bg-day.png'} alt={String(item.label || item.fileName)} />
               {item.isActive && (
                 <div className="selected-badge">Выбрано</div>
               )}
