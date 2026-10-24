@@ -146,19 +146,39 @@ function App() {
     }
 
     let timeoutId = 0;
+    let initialLoad = true;
     const publishWindowSize = () => {
+      if (initialLoad) {
+        return;
+      }
       window.clearTimeout(timeoutId);
       timeoutId = window.setTimeout(() => {
+        const w = Math.round(window.innerWidth);
+        const h = Math.round(window.innerHeight);
+        // Do not save maximized, fullscreen, or unconstrained dimensions
+        if (
+          w < 900 || w > 1400 ||
+          h < 600 || h > 860 ||
+          w >= (window.screen.availWidth - 60) ||
+          h >= (window.screen.availHeight - 60)
+        ) {
+          return;
+        }
         photinoBridge.sendCommand('host.windowSize', {
-          width: Math.round(window.innerWidth),
-          height: Math.round(window.innerHeight)
+          width: w,
+          height: h
         });
-      }, 250);
+      }, 500);
     };
 
-    publishWindowSize();
-    window.addEventListener('resize', publishWindowSize);
+    // Attach listener only after window has fully settled to avoid initial mount sizing glitches
+    const settleTimer = window.setTimeout(() => {
+      initialLoad = false;
+      window.addEventListener('resize', publishWindowSize);
+    }, 2500);
+
     return () => {
+      window.clearTimeout(settleTimer);
       window.clearTimeout(timeoutId);
       window.removeEventListener('resize', publishWindowSize);
     };
@@ -363,8 +383,21 @@ function App() {
     initializeLiquidSettingsButton();
     window.addEventListener('vesper-layout-change', debouncedInit);
     const observer = new MutationObserver((mutations) => {
-      const hasAddedNodes = mutations.some((m) => m.addedNodes.length > 0);
-      if (hasAddedNodes && document.querySelectorAll('.liquid-glass-layer:not([data-liquid-initialized])').length > 0) {
+      let hasNewLiquidLayer = false;
+      for (const m of mutations) {
+        for (let i = 0; i < m.addedNodes.length; i++) {
+          const node = m.addedNodes[i];
+          if (node.nodeType === 1) {
+            const el = node as HTMLElement;
+            if (el.classList?.contains('liquid-glass-layer') || el.querySelector?.('.liquid-glass-layer:not([data-liquid-initialized])')) {
+              hasNewLiquidLayer = true;
+              break;
+            }
+          }
+        }
+        if (hasNewLiquidLayer) break;
+      }
+      if (hasNewLiquidLayer) {
         debouncedInit();
       }
     });

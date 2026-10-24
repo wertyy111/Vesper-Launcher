@@ -57,6 +57,17 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) domReady(ctx context.Context) {
+	wailsRuntime.WindowUnmaximise(ctx)
+	w := a.state.WindowWidth
+	h := a.state.WindowHeight
+	if w < state.MinWindowWidth || w > state.MaxWindowWidth {
+		w = state.DefaultWindowWidth
+	}
+	if h < state.MinWindowHeight || h > state.MaxWindowHeight {
+		h = state.DefaultWindowHeight
+	}
+	wailsRuntime.WindowSetSize(ctx, w, h)
+	wailsRuntime.WindowCenter(ctx)
 	a.bridge.EmitSnapshot()
 }
 

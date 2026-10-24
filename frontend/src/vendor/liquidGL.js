@@ -1239,7 +1239,11 @@
         }
       };
 
+      const hoverStylesCache = new WeakMap();
       const findAppliedHoverStyles = (element) => {
+        if (hoverStylesCache.has(element)) {
+          return hoverStylesCache.get(element);
+        }
         let cssText = "";
         for (const sheet of document.styleSheets) {
           try {
@@ -1254,6 +1258,7 @@
             }
           } catch (e) {}
         }
+        hoverStylesCache.set(element, cssText);
         return cssText;
       };
 

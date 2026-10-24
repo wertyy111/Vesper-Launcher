@@ -183,15 +183,21 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 		b.EmitSnapshot()
 
 	case "host.windowsize":
+		if b.ctx != nil {
+			if wailsRuntime.WindowIsMaximised(b.ctx) || wailsRuntime.WindowIsFullscreen(b.ctx) {
+				return nil
+			}
+		}
 		w, _ := payload["width"].(float64)
 		h, _ := payload["height"].(float64)
-		if w >= 800 {
-			b.state.WindowWidth = int(w)
+		intW := int(w)
+		intH := int(h)
+		if intW >= state.MinWindowWidth && intW <= state.MaxWindowWidth &&
+			intH >= state.MinWindowHeight && intH <= state.MaxWindowHeight {
+			b.state.WindowWidth = intW
+			b.state.WindowHeight = intH
+			b.state.Save()
 		}
-		if h >= 500 {
-			b.state.WindowHeight = int(h)
-		}
-		b.state.Save()
 
 	case "main.selectversionkey":
 		if key, ok := payload["key"].(string); ok && key != "" {

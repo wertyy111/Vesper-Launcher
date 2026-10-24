@@ -12,6 +12,15 @@ import (
 	"vesper-launcher/internal/platform"
 )
 
+const (
+	DefaultWindowWidth  = 1020
+	DefaultWindowHeight = 640
+	MinWindowWidth      = 900
+	MinWindowHeight     = 600
+	MaxWindowWidth      = 1400
+	MaxWindowHeight     = 860
+)
+
 type LauncherState struct {
 	mu sync.RWMutex
 
@@ -69,8 +78,8 @@ func NewLauncherState() *LauncherState {
 		LoginFormPlacementId:    "center",
 		LauncherDirectoryViewId: "current",
 		JavaRuntimeMode:         "system",
-		WindowWidth:             1020,
-		WindowHeight:            640,
+		WindowWidth:             DefaultWindowWidth,
+		WindowHeight:            DefaultWindowHeight,
 		Updates: models.UpdatesSnapshot{
 			IsAvailable: false,
 			Version:     "1.0.65",
@@ -409,11 +418,15 @@ func (s *LauncherState) Load() {
 		if data.JavaRuntimeMode != "" {
 			s.JavaRuntimeMode = data.JavaRuntimeMode
 		}
-		if data.WindowWidth >= 600 {
+		if data.WindowWidth >= MinWindowWidth && data.WindowWidth <= MaxWindowWidth {
 			s.WindowWidth = data.WindowWidth
+		} else {
+			s.WindowWidth = DefaultWindowWidth
 		}
-		if data.WindowHeight >= 400 {
+		if data.WindowHeight >= MinWindowHeight && data.WindowHeight <= MaxWindowHeight {
 			s.WindowHeight = data.WindowHeight
+		} else {
+			s.WindowHeight = DefaultWindowHeight
 		}
 	}
 }

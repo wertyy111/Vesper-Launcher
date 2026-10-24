@@ -4,9 +4,12 @@ package main
 #include <stdlib.h>
 
 __attribute__((constructor)) static void setup_linux_env() {
-    setenv("GDK_BACKEND", "x11", 0);
-    setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", 0);
-    setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", 0);
+    const char *display = getenv("DISPLAY");
+    if (display != NULL && display[0] != '\0') {
+        setenv("GDK_BACKEND", "x11", 1);
+    }
+    setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", 1);
+    setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", 1);
 }
 */
 import "C"
@@ -22,6 +25,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
+
+	"vesper-launcher/internal/state"
 )
 
 //go:embed all:frontend/dist
@@ -34,20 +39,24 @@ func main() {
 	isFrameless := runtime.GOOS == "windows"
 
 	width := app.state.WindowWidth
-	if width < 900 {
-		width = 1020
+	if width < state.MinWindowWidth || width > state.MaxWindowWidth {
+		width = state.DefaultWindowWidth
 	}
 	height := app.state.WindowHeight
-	if height < 600 {
-		height = 640
+	if height < state.MinWindowHeight || height > state.MaxWindowHeight {
+		height = state.DefaultWindowHeight
 	}
 
 	err := wails.Run(&options.App{
 		Title:             "Vesper Launcher",
 		Width:             width,
 		Height:            height,
-		MinWidth:          900,
-		MinHeight:         620,
+		MinWidth:          state.MinWindowWidth,
+		MinHeight:         state.MinWindowHeight,
+		MaxWidth:          state.MaxWindowWidth,
+		MaxHeight:         state.MaxWindowHeight,
+		WindowStartState:  options.Normal,
+		DisableResize:     false,
 		Frameless:         isFrameless,
 		StartHidden:       false,
 		HideWindowOnClose: false,
@@ -70,6 +79,7 @@ func main() {
 			TitleBar:             mac.TitleBarDefault(),
 			WebviewIsTransparent: true,
 			WindowIsTranslucent:  false,
+			DisableZoom:          true,
 		},
 		Linux: &linux.Options{
 			Icon:                nil,
