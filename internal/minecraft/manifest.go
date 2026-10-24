@@ -32,16 +32,16 @@ type VersionEntry struct {
 }
 
 type VersionPackage struct {
-	ID                     string           `json:"id"`
-	MainClass              string           `json:"mainClass"`
-	InheritsFrom           string           `json:"inheritsFrom"`
-	MinecraftArguments     string           `json:"minecraftArguments"`
-	Arguments              *ArgumentRules   `json:"arguments"`
-	AssetIndex             *AssetIndexRef   `json:"assetIndex"`
-	Assets                 string           `json:"assets"`
-	Downloads              map[string]DownloadArtifact `json:"downloads"`
-	Libraries              []LibraryEntry   `json:"libraries"`
-	JavaVersion            *JavaVersionInfo `json:"javaVersion"`
+	ID                 string                      `json:"id"`
+	MainClass          string                      `json:"mainClass"`
+	InheritsFrom       string                      `json:"inheritsFrom"`
+	MinecraftArguments string                      `json:"minecraftArguments"`
+	Arguments          *ArgumentRules              `json:"arguments"`
+	AssetIndex         *AssetIndexRef              `json:"assetIndex"`
+	Assets             string                      `json:"assets"`
+	Downloads          map[string]DownloadArtifact `json:"downloads"`
+	Libraries          []LibraryEntry              `json:"libraries"`
+	JavaVersion        *JavaVersionInfo            `json:"javaVersion"`
 }
 
 type ArgumentRules struct {
@@ -65,10 +65,10 @@ type DownloadArtifact struct {
 }
 
 type LibraryEntry struct {
-	Name      string                      `json:"name"`
-	Downloads LibraryDownloads            `json:"downloads"`
-	Natives   map[string]string           `json:"natives"`
-	Rules     []RuleEntry                 `json:"rules"`
+	Name      string            `json:"name"`
+	Downloads LibraryDownloads  `json:"downloads"`
+	Natives   map[string]string `json:"natives"`
+	Rules     []RuleEntry       `json:"rules"`
 }
 
 type LibraryDownloads struct {

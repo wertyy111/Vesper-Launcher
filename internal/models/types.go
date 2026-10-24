@@ -120,6 +120,11 @@ type SettingsSnapshot struct {
 	MinecraftLanguageCode        string              `json:"minecraftLanguageCode"`
 	DisplayedGameDirectory       string              `json:"displayedGameDirectory"`
 	LanguageOptions              []map[string]string `json:"languageOptions"`
+	LoginFormPlacementId         string              `json:"loginFormPlacementId"`
+	LoginPlacementOptions        []map[string]string `json:"loginPlacementOptions"`
+	LauncherDirectoryViewId      string              `json:"launcherDirectoryViewId"`
+	DirectoryViewOptions         []map[string]string `json:"directoryViewOptions"`
+	JavaRuntimeOptions           []map[string]string `json:"javaRuntimeOptions"`
 }
 
 type SkinSnapshot struct {

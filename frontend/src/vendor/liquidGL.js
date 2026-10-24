@@ -94,6 +94,7 @@
       this.scaleFactor = 1;
       this.startTime = Date.now();
       this._scrollUpdateCounter = 0;
+      this._dirty = true;
 
       this._initGL();
 
@@ -104,18 +105,16 @@
       this._isScrolling = false;
       let lastScrollY = window.scrollY;
       let scrollTimeout;
-      const scrollCheck = () => {
-        if (window.scrollY !== lastScrollY) {
-          this._isScrolling = true;
-          lastScrollY = window.scrollY;
-          clearTimeout(scrollTimeout);
-          scrollTimeout = setTimeout(() => {
-            this._isScrolling = false;
-          }, 200);
-        }
-        requestAnimationFrame(scrollCheck);
+      const onScroll = () => {
+        this._isScrolling = true;
+        this._dirty = true;
+        lastScrollY = window.scrollY;
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          this._isScrolling = false;
+        }, 200);
       };
-      requestAnimationFrame(scrollCheck);
+      window.addEventListener("scroll", onScroll, { passive: true });
 
       const onResize = debounce(() => {
         if (this._capturing || this._isScrolling) return;
@@ -142,6 +141,7 @@
         "vesper-layout-change",
         () => {
           this.lenses.forEach((l) => l.updateMetrics(true));
+          this._dirty = true;
           this.render();
         },
         { passive: true }
@@ -591,7 +591,7 @@
 
       this.textureWidth = srcCanvas.width;
       this.textureHeight = srcCanvas.height;
-
+      this._dirty = true;
       this.render();
 
       if (this._pendingReveal.length) {
@@ -604,6 +604,7 @@
     addLens(element, options) {
       const lens = new liquidGLLens(this, element, options);
       this.lenses.push(lens);
+      this._dirty = true;
 
       const maxZ = this._getMaxLensZ();
       if (maxZ > 0) {
@@ -922,6 +923,7 @@
 
     /* ----------------------------- */
     _updateDynamicNodes() {
+      if (!this._dynamicNodes || this._dynamicNodes.length === 0) return;
       if (this._isScrolling && this._scrollUpdateCounter % 2 !== 0) return;
       const gl = this.gl;
       if (!this.texture || !this._dynMeta) return;
@@ -1477,6 +1479,7 @@
       if (typeof ResizeObserver !== "undefined" && !this._sizeObs) {
         this._sizeObs = new ResizeObserver(() => {
           this.updateMetrics(true);
+          this.renderer._dirty = true;
           this.renderer.render();
         });
         this._sizeObs.observe(this.el);
@@ -2083,9 +2086,13 @@
 
     if (!renderer._rafId && !renderer.useExternalTicker) {
       const loop = () => {
-        renderer.render();
+        if (renderer._dirty) {
+          renderer.render();
+          renderer._dirty = false;
+        }
         renderer._rafId = requestAnimationFrame(loop);
       };
+      renderer._dirty = true;
       renderer._rafId = requestAnimationFrame(loop);
     }
 

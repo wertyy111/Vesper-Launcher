@@ -25,12 +25,12 @@ import (
 )
 
 type BridgeService struct {
-	ctx         context.Context
-	state       *state.LauncherState
-	account     *account.VesperAccountService
-	msaAuth     *auth.MicrosoftAuthService
-	modsClient  *mods.ModrinthClient
-	updaterSvc  *updater.UpdateService
+	ctx        context.Context
+	state      *state.LauncherState
+	account    *account.VesperAccountService
+	msaAuth    *auth.MicrosoftAuthService
+	modsClient *mods.ModrinthClient
+	updaterSvc *updater.UpdateService
 }
 
 func NewBridgeService(s *state.LauncherState) *BridgeService {
@@ -181,6 +181,17 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 	switch norm {
 	case "host.requestsnapshot", "bridge.requestsnapshot":
 		b.EmitSnapshot()
+
+	case "host.windowsize":
+		w, _ := payload["width"].(float64)
+		h, _ := payload["height"].(float64)
+		if w >= 800 {
+			b.state.WindowWidth = int(w)
+		}
+		if h >= 500 {
+			b.state.WindowHeight = int(h)
+		}
+		b.state.Save()
 
 	case "main.selectversionkey":
 		if key, ok := payload["key"].(string); ok && key != "" {
@@ -338,6 +349,12 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 		switch field {
 		case "minecraftLanguageCode":
 			b.state.LanguageCode = val
+		case "loginFormPlacementId":
+			b.state.LoginFormPlacementId = val
+		case "launcherDirectoryViewId":
+			b.state.LauncherDirectoryViewId = val
+		case "javaRuntimeMode":
+			b.state.JavaRuntimeMode = val
 		}
 		b.state.Save()
 		b.EmitSnapshot()

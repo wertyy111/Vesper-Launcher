@@ -33,10 +33,19 @@ func main() {
 	// Frameless only on Windows (Linux and macOS use standard native OS window frame)
 	isFrameless := runtime.GOOS == "windows"
 
+	width := app.state.WindowWidth
+	if width < 900 {
+		width = 1020
+	}
+	height := app.state.WindowHeight
+	if height < 600 {
+		height = 640
+	}
+
 	err := wails.Run(&options.App{
 		Title:             "Vesper Launcher",
-		Width:             1200,
-		Height:            800,
+		Width:             width,
+		Height:            height,
 		MinWidth:          900,
 		MinHeight:         620,
 		Frameless:         isFrameless,

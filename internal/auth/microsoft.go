@@ -165,7 +165,7 @@ func (s *MicrosoftAuthService) exchangeForMinecraft(msaToken, refreshToken strin
 	defer xblResp.Body.Close()
 
 	var xblResult struct {
-		Token        string `json:"Token"`
+		Token         string `json:"Token"`
 		DisplayClaims struct {
 			Xui []struct {
 				Uhs string `json:"uhs"`

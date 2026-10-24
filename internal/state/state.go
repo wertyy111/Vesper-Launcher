@@ -14,52 +14,62 @@ import (
 type LauncherState struct {
 	mu sync.RWMutex
 
-	ActiveSection     string
-	ActiveSettingsTab string
-	IsBusy            bool
-	IsGameRunning     bool
-	Nickname          string
-	AvatarUrl         string
-	HasAccount        bool
-	AccountType       string
-	SelectedVersion   string
-	StatusText        string
-	ProgressText      string
-	ProgressOverlay   string
-	ProgressPercent   float64
-	IsIndeterminate   bool
-	JavaMemoryMb      int
-	JavaPath          string
-	JvmArgs           string
-	LanguageCode      string
-	SkinModel         string
-	AutoClose         bool
-	CurrentBgUrl      string
-	CurrentSkinUrl    string
-	SearchQuery       string
-	SelectedCategory  string
-	ModProvider       string
-	IsCatalogLoading  bool
-	ModItems          []models.ModItem
-	Versions          []models.VersionOption
-	Friends           []models.FriendEntry
-	FriendRequests    []models.FriendRequest
-	Updates           models.UpdatesSnapshot
+	ActiveSection           string
+	ActiveSettingsTab       string
+	IsBusy                  bool
+	IsGameRunning           bool
+	Nickname                string
+	AvatarUrl               string
+	HasAccount              bool
+	AccountType             string
+	SelectedVersion         string
+	StatusText              string
+	ProgressText            string
+	ProgressOverlay         string
+	ProgressPercent         float64
+	IsIndeterminate         bool
+	JavaMemoryMb            int
+	JavaPath                string
+	JvmArgs                 string
+	LanguageCode            string
+	SkinModel               string
+	AutoClose               bool
+	CurrentBgUrl            string
+	CurrentSkinUrl          string
+	SearchQuery             string
+	SelectedCategory        string
+	ModProvider             string
+	IsCatalogLoading        bool
+	LoginFormPlacementId    string
+	LauncherDirectoryViewId string
+	JavaRuntimeMode         string
+	WindowWidth             int
+	WindowHeight            int
+	ModItems                []models.ModItem
+	Versions                []models.VersionOption
+	Friends                 []models.FriendEntry
+	FriendRequests          []models.FriendRequest
+	Updates                 models.UpdatesSnapshot
 }
 
 func NewLauncherState() *LauncherState {
 	s := &LauncherState{
-		ActiveSection:     "none",
-		ActiveSettingsTab: "launcher",
-		Nickname:          "Steve",
-		StatusText:        "Готов к запуску",
-		SelectedVersion:   "1.21.4",
-		JavaMemoryMb:      4096,
-		LanguageCode:      "ru_ru",
-		CurrentSkinUrl:    "/assets/steve.png",
-		SkinModel:         "auto",
-		SelectedCategory:  "Моды",
-		ModProvider:       "modrinth",
+		ActiveSection:           "none",
+		ActiveSettingsTab:       "launcher",
+		Nickname:                "Steve",
+		StatusText:              "Готов к запуску",
+		SelectedVersion:         "1.21.4",
+		JavaMemoryMb:            4096,
+		LanguageCode:            "ru_ru",
+		CurrentSkinUrl:          "/assets/steve.png",
+		SkinModel:               "auto",
+		SelectedCategory:        "Моды",
+		ModProvider:             "modrinth",
+		LoginFormPlacementId:    "center",
+		LauncherDirectoryViewId: "current",
+		JavaRuntimeMode:         "system",
+		WindowWidth:             1020,
+		WindowHeight:            640,
 		Updates: models.UpdatesSnapshot{
 			IsAvailable: false,
 			Version:     "1.0.65",
@@ -127,7 +137,7 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 			CanAccessFriends:   true,
 			NotificationsCount: len(s.FriendRequests),
 			Notifications:      []map[string]any{},
-			Updates: s.Updates,
+			Updates:            s.Updates,
 			Theme: models.ThemeSnapshot{
 				BackgroundUrl: s.CurrentBgUrl,
 				LogoUrl:       "/assets/vesper-logo.png",
@@ -175,14 +185,28 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 				AutoCloseOnLaunch:            s.AutoClose,
 				RestoreLauncherAfterGameExit: true,
 				ClickSoundEnabled:            true,
-				JavaRuntimeMode:              "auto",
-				JavaModeHint:                 "Лаунчер автоматически скачает совместимую Java Temurin (OpenJDK) для запуска выбранной версии Minecraft.",
-				AutoMemoryHint:               "Память задана вручную.",
-				AutoMinimizeHint:             "Будет скрыт после запуска игры.",
-				RestoreHint:                  "Лаунчер восстановится после завершения игры.",
-				JvmArgsHint:                  "Поле открыто.",
-				MinecraftLanguageCode:        s.LanguageCode,
-				DisplayedGameDirectory:       platform.GetMinecraftDir(),
+				JavaRuntimeMode:              s.JavaRuntimeMode,
+				JavaRuntimeOptions: []map[string]string{
+					{"id": "system", "label": "Системная Java"},
+					{"id": "custom", "label": "Свой путь"},
+				},
+				LoginFormPlacementId: s.LoginFormPlacementId,
+				LoginPlacementOptions: []map[string]string{
+					{"id": "center", "label": "Центр"},
+					{"id": "left", "label": "Слева"},
+				},
+				LauncherDirectoryViewId: s.LauncherDirectoryViewId,
+				DirectoryViewOptions: []map[string]string{
+					{"id": "current", "label": "Текущая"},
+					{"id": "minecraft", "label": ".minecraft"},
+				},
+				JavaModeHint:           "Лаунчер использует системную или указанную Java для запуска Minecraft.",
+				AutoMemoryHint:         "Память задана вручную.",
+				AutoMinimizeHint:       "Будет скрыт после запуска игры.",
+				RestoreHint:            "Лаунчер восстановится после завершения игры.",
+				JvmArgsHint:            "Поле открыто.",
+				MinecraftLanguageCode:  s.LanguageCode,
+				DisplayedGameDirectory: platform.GetMinecraftDir(),
 				LanguageOptions: []map[string]string{
 					{"id": "auto", "label": "Авто"},
 					{"id": "ru_ru", "label": "Русский"},
@@ -282,13 +306,18 @@ func (s *LauncherState) SetBackground(bgUrl string) {
 }
 
 type serializedState struct {
-	Nickname        string `json:"nickname"`
-	SelectedVersion string `json:"selectedVersion"`
-	JavaMemoryMb    int    `json:"javaMemoryMb"`
-	JavaPath        string `json:"javaPath"`
-	JvmArgs         string `json:"jvmArgs"`
-	LanguageCode    string `json:"languageCode"`
-	CurrentBgUrl    string `json:"currentBgUrl"`
+	Nickname                string `json:"nickname"`
+	SelectedVersion         string `json:"selectedVersion"`
+	JavaMemoryMb            int    `json:"javaMemoryMb"`
+	JavaPath                string `json:"javaPath"`
+	JvmArgs                 string `json:"jvmArgs"`
+	LanguageCode            string `json:"languageCode"`
+	CurrentBgUrl            string `json:"currentBgUrl"`
+	LoginFormPlacementId    string `json:"loginFormPlacementId"`
+	LauncherDirectoryViewId string `json:"launcherDirectoryViewId"`
+	JavaRuntimeMode         string `json:"javaRuntimeMode"`
+	WindowWidth             int    `json:"windowWidth"`
+	WindowHeight            int    `json:"windowHeight"`
 }
 
 func (s *LauncherState) Save() {
@@ -297,13 +326,18 @@ func (s *LauncherState) Save() {
 	filePath := filepath.Join(configDir, "launcher-state.json")
 
 	data := serializedState{
-		Nickname:        s.Nickname,
-		SelectedVersion: s.SelectedVersion,
-		JavaMemoryMb:    s.JavaMemoryMb,
-		JavaPath:        s.JavaPath,
-		JvmArgs:         s.JvmArgs,
-		LanguageCode:    s.LanguageCode,
-		CurrentBgUrl:    s.CurrentBgUrl,
+		Nickname:                s.Nickname,
+		SelectedVersion:         s.SelectedVersion,
+		JavaMemoryMb:            s.JavaMemoryMb,
+		JavaPath:                s.JavaPath,
+		JvmArgs:                 s.JvmArgs,
+		LanguageCode:            s.LanguageCode,
+		CurrentBgUrl:            s.CurrentBgUrl,
+		LoginFormPlacementId:    s.LoginFormPlacementId,
+		LauncherDirectoryViewId: s.LauncherDirectoryViewId,
+		JavaRuntimeMode:         s.JavaRuntimeMode,
+		WindowWidth:             s.WindowWidth,
+		WindowHeight:            s.WindowHeight,
 	}
 
 	bytes, err := json.MarshalIndent(data, "", "  ")
@@ -343,6 +377,21 @@ func (s *LauncherState) Load() {
 		}
 		if data.CurrentBgUrl != "" {
 			s.CurrentBgUrl = data.CurrentBgUrl
+		}
+		if data.LoginFormPlacementId != "" {
+			s.LoginFormPlacementId = data.LoginFormPlacementId
+		}
+		if data.LauncherDirectoryViewId != "" {
+			s.LauncherDirectoryViewId = data.LauncherDirectoryViewId
+		}
+		if data.JavaRuntimeMode != "" {
+			s.JavaRuntimeMode = data.JavaRuntimeMode
+		}
+		if data.WindowWidth >= 600 {
+			s.WindowWidth = data.WindowWidth
+		}
+		if data.WindowHeight >= 400 {
+			s.WindowHeight = data.WindowHeight
 		}
 	}
 }
@@ -391,4 +440,3 @@ func (s *LauncherState) SetAuth(hasAuth bool, accountType, nick, avatar string) 
 	}
 	s.Save()
 }
-

@@ -116,15 +116,15 @@ func BuildGameArguments(ctx LaunchContext, rawTemplate string) []string {
 	}
 
 	replacements := map[string]string{
-		"${auth_player_name}": ctx.Username,
-		"${version_name}":     ctx.VersionID,
-		"${game_directory}":   ctx.MinecraftDir,
-		"${assets_root}":      ctx.AssetsDir,
+		"${auth_player_name}":  ctx.Username,
+		"${version_name}":      ctx.VersionID,
+		"${game_directory}":    ctx.MinecraftDir,
+		"${assets_root}":       ctx.AssetsDir,
 		"${assets_index_name}": ctx.AssetIndex,
-		"${auth_uuid}":        ctx.UUID,
+		"${auth_uuid}":         ctx.UUID,
 		"${auth_access_token}": ctx.AccessToken,
-		"${user_type}":        ctx.UserType,
-		"${version_type}":     ctx.VersionType,
+		"${user_type}":         ctx.UserType,
+		"${version_type}":      ctx.VersionType,
 	}
 
 	tokens := strings.Fields(rawTemplate)
