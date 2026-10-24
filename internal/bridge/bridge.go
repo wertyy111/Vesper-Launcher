@@ -95,52 +95,167 @@ func (b *BridgeService) buildVersionCatalog(manifest *minecraft.VersionManifestV
 	var catalog []models.VersionOption
 	seen := make(map[string]bool)
 
-	// Add bundled ForgeOptiFine 1.16.5
-	catalog = append(catalog, models.VersionOption{
+	addOption := func(opt models.VersionOption) {
+		lower := strings.ToLower(opt.Key)
+		if seen[lower] {
+			return
+		}
+		seen[lower] = true
+		if installedMap[lower] {
+			opt.IsInstalled = true
+		}
+		catalog = append(catalog, opt)
+	}
+
+	// 1. Add bundled ForgeOptiFine 1.16.5
+	addOption(models.VersionOption{
 		Key:         "ForgeOptiFine 1.16.5",
 		DisplayName: "1.16.5 - Forge + OptiFine",
 		Category:    "forge",
 		IsInstalled: true,
 	})
-	seen["forgeoptifine 1.16.5"] = true
 
-	// If we have a manifest, add official releases
+	// 2. Mod loaders (Fabric, Forge, NeoForge, OptiFine) for popular releases
+	type loaderSpec struct {
+		prefix   string
+		name     string
+		category string
+	}
+
+	targetReleases := []struct {
+		mcVersion string
+		loaders   []loaderSpec
+	}{
+		{
+			mcVersion: "1.21.4",
+			loaders: []loaderSpec{
+				{prefix: "fabric", name: "Fabric", category: "fabric"},
+				{prefix: "neoforge", name: "NeoForge", category: "neoforge"},
+			},
+		},
+		{
+			mcVersion: "1.21.1",
+			loaders: []loaderSpec{
+				{prefix: "fabric", name: "Fabric", category: "fabric"},
+				{prefix: "neoforge", name: "NeoForge", category: "neoforge"},
+				{prefix: "forge", name: "Forge", category: "forge"},
+			},
+		},
+		{
+			mcVersion: "1.20.4",
+			loaders: []loaderSpec{
+				{prefix: "fabric", name: "Fabric", category: "fabric"},
+				{prefix: "neoforge", name: "NeoForge", category: "neoforge"},
+				{prefix: "forge", name: "Forge", category: "forge"},
+				{prefix: "optifine", name: "OptiFine", category: "optifine"},
+			},
+		},
+		{
+			mcVersion: "1.20.1",
+			loaders: []loaderSpec{
+				{prefix: "fabric", name: "Fabric", category: "fabric"},
+				{prefix: "forge", name: "Forge", category: "forge"},
+				{prefix: "neoforge", name: "NeoForge", category: "neoforge"},
+				{prefix: "optifine", name: "OptiFine", category: "optifine"},
+			},
+		},
+		{
+			mcVersion: "1.19.4",
+			loaders: []loaderSpec{
+				{prefix: "fabric", name: "Fabric", category: "fabric"},
+				{prefix: "forge", name: "Forge", category: "forge"},
+				{prefix: "optifine", name: "OptiFine", category: "optifine"},
+			},
+		},
+		{
+			mcVersion: "1.19.2",
+			loaders: []loaderSpec{
+				{prefix: "fabric", name: "Fabric", category: "fabric"},
+				{prefix: "forge", name: "Forge", category: "forge"},
+				{prefix: "optifine", name: "OptiFine", category: "optifine"},
+			},
+		},
+		{
+			mcVersion: "1.18.2",
+			loaders: []loaderSpec{
+				{prefix: "fabric", name: "Fabric", category: "fabric"},
+				{prefix: "forge", name: "Forge", category: "forge"},
+				{prefix: "optifine", name: "OptiFine", category: "optifine"},
+			},
+		},
+		{
+			mcVersion: "1.16.5",
+			loaders: []loaderSpec{
+				{prefix: "fabric", name: "Fabric", category: "fabric"},
+				{prefix: "forge", name: "Forge", category: "forge"},
+				{prefix: "optifine", name: "OptiFine", category: "optifine"},
+			},
+		},
+		{
+			mcVersion: "1.12.2",
+			loaders: []loaderSpec{
+				{prefix: "forge", name: "Forge", category: "forge"},
+				{prefix: "optifine", name: "OptiFine", category: "optifine"},
+			},
+		},
+		{
+			mcVersion: "1.8.9",
+			loaders: []loaderSpec{
+				{prefix: "forge", name: "Forge", category: "forge"},
+				{prefix: "optifine", name: "OptiFine", category: "optifine"},
+			},
+		},
+		{
+			mcVersion: "1.7.10",
+			loaders: []loaderSpec{
+				{prefix: "forge", name: "Forge", category: "forge"},
+			},
+		},
+	}
+
+	for _, tr := range targetReleases {
+		// Vanilla release
+		addOption(models.VersionOption{
+			Key:         tr.mcVersion,
+			DisplayName: tr.mcVersion + " - Ванильная",
+			Category:    "release",
+		})
+		// Loaders for this release
+		for _, l := range tr.loaders {
+			key := fmt.Sprintf("%s-%s", l.prefix, tr.mcVersion)
+			addOption(models.VersionOption{
+				Key:         key,
+				DisplayName: fmt.Sprintf("%s - %s", tr.mcVersion, l.name),
+				Category:    l.category,
+			})
+		}
+	}
+
+	// 3. If we have a manifest, add other official releases
 	if manifest != nil && len(manifest.Versions) > 0 {
 		for _, v := range manifest.Versions {
 			if v.Type != "release" {
 				continue
 			}
-			lower := strings.ToLower(v.ID)
-			if seen[lower] {
-				continue
-			}
-			seen[lower] = true
-			catalog = append(catalog, models.VersionOption{
+			addOption(models.VersionOption{
 				Key:         v.ID,
 				DisplayName: v.ID + " - Ванильная",
 				Category:    "release",
-				IsInstalled: installedMap[lower],
 			})
 		}
 	} else {
 		// Popular releases fallback
 		popularReleases := []string{"1.21.4", "1.21.3", "1.21.1", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.16.5", "1.12.2", "1.8.9"}
 		for _, rel := range popularReleases {
-			lower := strings.ToLower(rel)
-			if seen[lower] {
-				continue
-			}
-			seen[lower] = true
-			catalog = append(catalog, models.VersionOption{
+			addOption(models.VersionOption{
 				Key:         rel,
 				DisplayName: rel + " - Ванильная",
 				Category:    "release",
-				IsInstalled: installedMap[lower],
 			})
 		}
 	}
 
-	// Also add any other installed custom versions from ~/.minecraft/versions
+	// 4. Also add any other installed custom versions from ~/.minecraft/versions
 	if entries, err := os.ReadDir(versionsDir); err == nil {
 		for _, e := range entries {
 			name := e.Name()

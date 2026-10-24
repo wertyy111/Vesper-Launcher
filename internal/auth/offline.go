@@ -34,8 +34,8 @@ func CreateOfflineProfile(nickname string) UserProfile {
 	return UserProfile{
 		Username:    trimmed,
 		UUID:        formattedUUID,
-		AccessToken: "00000000-0000-0000-0000-000000000000",
-		UserType:    "mojang",
+		AccessToken: rawHex,
+		UserType:    "legacy",
 		IsOffline:   true,
 	}
 }

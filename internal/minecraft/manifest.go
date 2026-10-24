@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"vesper-launcher/internal/platform"
@@ -66,9 +67,42 @@ type DownloadArtifact struct {
 
 type LibraryEntry struct {
 	Name      string            `json:"name"`
+	URL       string            `json:"url"`
 	Downloads LibraryDownloads  `json:"downloads"`
 	Natives   map[string]string `json:"natives"`
 	Rules     []RuleEntry       `json:"rules"`
+}
+
+// MavenCoordinatesToPath converts Maven coordinates (e.g., "group:artifact:version[:classifier]") to a relative file path.
+func MavenCoordinatesToPath(mavenName string) (string, error) {
+	parts := strings.Split(mavenName, ":")
+	if len(parts) < 3 {
+		return "", fmt.Errorf("invalid maven coordinates: %s", mavenName)
+	}
+
+	groupPath := strings.ReplaceAll(parts[0], ".", "/")
+	artifact := parts[1]
+	version := parts[2]
+	ext := "jar"
+	classifier := ""
+
+	if len(parts) > 3 {
+		classifier = parts[3]
+		if atIdx := strings.Index(classifier, "@"); atIdx != -1 {
+			ext = classifier[atIdx+1:]
+			classifier = classifier[:atIdx]
+		}
+	} else if atIdx := strings.Index(version, "@"); atIdx != -1 {
+		ext = version[atIdx+1:]
+		version = version[:atIdx]
+	}
+
+	fileName := fmt.Sprintf("%s-%s.%s", artifact, version, ext)
+	if classifier != "" {
+		fileName = fmt.Sprintf("%s-%s-%s.%s", artifact, version, classifier, ext)
+	}
+
+	return filepath.Join(filepath.FromSlash(groupPath), artifact, version, fileName), nil
 }
 
 type LibraryDownloads struct {

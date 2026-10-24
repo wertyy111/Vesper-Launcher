@@ -69,6 +69,14 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 					seenLibs[fullPath] = true
 					libPaths = append(libPaths, fullPath)
 				}
+			} else if lib.Name != "" {
+				if relPath, err := MavenCoordinatesToPath(lib.Name); err == nil {
+					fullPath := filepath.Join(librariesDir, relPath)
+					if _, errS := os.Stat(fullPath); errS == nil && !seenLibs[fullPath] {
+						seenLibs[fullPath] = true
+						libPaths = append(libPaths, fullPath)
+					}
+				}
 			}
 		}
 	}
@@ -111,6 +119,14 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 	// 6. Auth profile
 	profile := auth.CreateOfflineProfile(opts.Nickname)
 
+	userUUID := profile.UUID
+	userToken := profile.AccessToken
+	if isLegacyVersion(opts.VersionID) {
+		raw := strings.ReplaceAll(profile.UUID, "-", "")
+		userUUID = raw
+		userToken = raw
+	}
+
 	// 7. Assets resolution
 	assetsDir := filepath.Join(mcDir, "assets")
 	assetIndex := pkg.Assets
@@ -135,6 +151,17 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 		mainClass = "net.minecraft.client.main.Main"
 	}
 
+	var gameArgsList []any
+	var jvmArgsList []any
+	if parentPkg != nil && parentPkg.Arguments != nil {
+		gameArgsList = append(gameArgsList, parentPkg.Arguments.Game...)
+		jvmArgsList = append(jvmArgsList, parentPkg.Arguments.Jvm...)
+	}
+	if pkg.Arguments != nil {
+		gameArgsList = append(gameArgsList, pkg.Arguments.Game...)
+		jvmArgsList = append(jvmArgsList, pkg.Arguments.Jvm...)
+	}
+
 	ctx := LaunchContext{
 		MinecraftDir: mcDir,
 		VersionID:    opts.VersionID,
@@ -142,14 +169,16 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 		Classpath:    classpath,
 		MainClass:    mainClass,
 		Username:     profile.Username,
-		UUID:         profile.UUID,
-		AccessToken:  profile.AccessToken,
+		UUID:         userUUID,
+		AccessToken:  userToken,
 		UserType:     profile.UserType,
 		VersionType:  "release",
 		AssetsDir:    assetsDir,
 		AssetIndex:   assetIndex,
 		MemoryMb:     opts.MemoryMb,
 		CustomJvm:    opts.CustomJvm,
+		GameArgs:     gameArgsList,
+		JvmArgs:      jvmArgsList,
 	}
 
 	jvmArgs := BuildJvmArguments(ctx)
@@ -226,4 +255,15 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 	}()
 
 	return cmd, nil
+}
+
+func isLegacyVersion(versionID string) bool {
+	v := strings.ToLower(versionID)
+	legacyMarkers := []string{"1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6", "1.5"}
+	for _, marker := range legacyMarkers {
+		if strings.Contains(v, marker) {
+			return true
+		}
+	}
+	return false
 }

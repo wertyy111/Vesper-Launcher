@@ -1,6 +1,8 @@
 package minecraft
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,24 +53,65 @@ func EnsureVersionInstalled(versionID string, onProgress func(percent float64, m
 
 	pkg, err := LoadVersionPackage(versionID, "")
 	if err != nil {
-		// Try resolving from Mojang manifest
-		manifest, errM := FetchMojangManifest()
-		if errM != nil {
-			return nil, fmt.Errorf("failed to fetch manifest: %w", errM)
-		}
-		var foundUrl string
-		for _, v := range manifest.Versions {
-			if strings.EqualFold(v.ID, versionID) {
-				foundUrl = v.URL
-				break
+		lowerID := strings.ToLower(versionID)
+		if strings.HasPrefix(lowerID, "fabric-") {
+			mcVer := strings.TrimPrefix(lowerID, "fabric-")
+			if onProgress != nil {
+				onProgress(8, fmt.Sprintf("Загрузка профиля Fabric для Minecraft %s...", mcVer))
+			}
+			fPkg, errF := fetchFabricProfile(mcVer, versionID)
+			if errF == nil && fPkg != nil {
+				pkg = fPkg
+				err = nil
+			} else {
+				fmt.Printf("[Installer] Fabric fetch error: %v\n", errF)
+			}
+		} else if strings.HasPrefix(lowerID, "forge-") {
+			mcVer := strings.TrimPrefix(lowerID, "forge-")
+			if onProgress != nil {
+				onProgress(8, fmt.Sprintf("Загрузка профиля Forge для Minecraft %s...", mcVer))
+			}
+			forgePkg, errForge := fetchForgeProfile(mcVer, versionID)
+			if errForge == nil && forgePkg != nil {
+				pkg = forgePkg
+				err = nil
+			} else {
+				fmt.Printf("[Installer] Forge fetch error: %v\n", errForge)
+			}
+		} else if strings.HasPrefix(lowerID, "neoforge-") {
+			mcVer := strings.TrimPrefix(lowerID, "neoforge-")
+			if onProgress != nil {
+				onProgress(8, fmt.Sprintf("Загрузка профиля NeoForge для Minecraft %s...", mcVer))
+			}
+			neoPkg, errNeo := fetchNeoForgeProfile(mcVer, versionID)
+			if errNeo == nil && neoPkg != nil {
+				pkg = neoPkg
+				err = nil
+			} else {
+				fmt.Printf("[Installer] NeoForge fetch error: %v\n", errNeo)
 			}
 		}
-		if foundUrl == "" {
-			return nil, fmt.Errorf("version %s not found in Mojang manifest or local storage", versionID)
-		}
-		pkg, err = LoadVersionPackage(versionID, foundUrl)
+
 		if err != nil {
-			return nil, fmt.Errorf("failed to download version JSON: %w", err)
+			// Try resolving from Mojang manifest
+			manifest, errM := FetchMojangManifest()
+			if errM != nil {
+				return nil, fmt.Errorf("failed to fetch manifest: %w", errM)
+			}
+			var foundUrl string
+			for _, v := range manifest.Versions {
+				if strings.EqualFold(v.ID, versionID) {
+					foundUrl = v.URL
+					break
+				}
+			}
+			if foundUrl == "" {
+				return nil, fmt.Errorf("version %s not found in Mojang manifest or local storage", versionID)
+			}
+			pkg, err = LoadVersionPackage(versionID, foundUrl)
+			if err != nil {
+				return nil, fmt.Errorf("failed to download version JSON: %w", err)
+			}
 		}
 	}
 
@@ -104,6 +147,20 @@ func EnsureVersionInstalled(versionID string, onProgress func(percent float64, m
 					Sha1: lib.Downloads.Artifact.Sha1,
 					Size: lib.Downloads.Artifact.Size,
 				})
+			} else if lib.Name != "" {
+				relPath, err := MavenCoordinatesToPath(lib.Name)
+				if err == nil {
+					destPath := filepath.Join(librariesDir, relPath)
+					if _, errS := os.Stat(destPath); os.IsNotExist(errS) {
+						downloadUrl := resolveMavenDownloadUrl(lib, relPath)
+						if downloadUrl != "" {
+							tasks = append(tasks, DownloadTask{
+								URL:  downloadUrl,
+								Path: destPath,
+							})
+						}
+					}
+				}
 			}
 
 			if lib.Natives != nil && lib.Downloads.Classifiers != nil {
@@ -243,6 +300,261 @@ func EnsureVersionInstalled(versionID string, onProgress func(percent float64, m
 	}
 
 	return pkg, nil
+}
+
+func fetchFabricProfile(mcVersion, versionID string) (*VersionPackage, error) {
+	loaderListURL := fmt.Sprintf("https://meta.fabricmc.net/v2/versions/loader/%s", mcVersion)
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Get(loaderListURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fabric meta returned status: %d", resp.StatusCode)
+	}
+
+	var loaders []struct {
+		Loader struct {
+			Version string `json:"version"`
+			Stable  bool   `json:"stable"`
+		} `json:"loader"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&loaders); err != nil {
+		return nil, err
+	}
+	if len(loaders) == 0 {
+		return nil, fmt.Errorf("no fabric loader available for Minecraft %s", mcVersion)
+	}
+
+	loaderVer := loaders[0].Loader.Version
+	for _, l := range loaders {
+		if l.Loader.Stable {
+			loaderVer = l.Loader.Version
+			break
+		}
+	}
+
+	profileURL := fmt.Sprintf("https://meta.fabricmc.net/v2/versions/loader/%s/%s/profile/json", mcVersion, loaderVer)
+	resp2, err := client.Get(profileURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp2.Body.Close()
+
+	if resp2.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fabric profile returned status: %d", resp2.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp2.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var rawMap map[string]any
+	if err := json.Unmarshal(data, &rawMap); err == nil {
+		rawMap["id"] = versionID
+		rawMap["inheritsFrom"] = mcVersion
+		data, _ = json.MarshalIndent(rawMap, "", "  ")
+	}
+
+	mcDir := platform.GetMinecraftDir()
+	savePath := filepath.Join(mcDir, "versions", versionID, versionID+".json")
+	_ = os.MkdirAll(filepath.Dir(savePath), 0755)
+	_ = os.WriteFile(savePath, data, 0644)
+
+	var pkg VersionPackage
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return nil, err
+	}
+	return &pkg, nil
+}
+
+func fetchForgeProfile(mcVersion, versionID string) (*VersionPackage, error) {
+	buildsURL := fmt.Sprintf("https://bmclapi2.bangbang93.com/forge/minecraft/%s", mcVersion)
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Get(buildsURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bmclapi forge returned status: %d", resp.StatusCode)
+	}
+
+	var builds []struct {
+		Version string `json:"version"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&builds); err != nil {
+		return nil, err
+	}
+	if len(builds) == 0 {
+		return nil, fmt.Errorf("no forge build available for Minecraft %s", mcVersion)
+	}
+
+	forgeVer := builds[len(builds)-1].Version
+	installerURL := fmt.Sprintf("https://maven.minecraftforge.net/net/minecraftforge/forge/%s-%s/forge-%s-%s-installer.jar", mcVersion, forgeVer, mcVersion, forgeVer)
+	mirrorURL := fmt.Sprintf("https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/%s-%s/forge-%s-%s-installer.jar", mcVersion, forgeVer, mcVersion, forgeVer)
+
+	jarBytes, err := downloadWithFallback(installerURL, mirrorURL)
+	if err != nil {
+		return nil, err
+	}
+
+	zipReader, err := zip.NewReader(bytes.NewReader(jarBytes), int64(len(jarBytes)))
+	if err != nil {
+		return nil, err
+	}
+
+	var versionJsonBytes []byte
+	for _, f := range zipReader.File {
+		if f.Name == "version.json" {
+			rc, err := f.Open()
+			if err == nil {
+				versionJsonBytes, _ = io.ReadAll(rc)
+				_ = rc.Close()
+			}
+			break
+		}
+	}
+
+	if len(versionJsonBytes) == 0 {
+		return nil, fmt.Errorf("version.json not found in forge installer jar")
+	}
+
+	var rawMap map[string]any
+	if err := json.Unmarshal(versionJsonBytes, &rawMap); err == nil {
+		rawMap["id"] = versionID
+		rawMap["inheritsFrom"] = mcVersion
+		versionJsonBytes, _ = json.MarshalIndent(rawMap, "", "  ")
+	}
+
+	mcDir := platform.GetMinecraftDir()
+	savePath := filepath.Join(mcDir, "versions", versionID, versionID+".json")
+	_ = os.MkdirAll(filepath.Dir(savePath), 0755)
+	_ = os.WriteFile(savePath, versionJsonBytes, 0644)
+
+	var pkg VersionPackage
+	if err := json.Unmarshal(versionJsonBytes, &pkg); err != nil {
+		return nil, err
+	}
+	return &pkg, nil
+}
+
+func fetchNeoForgeProfile(mcVersion, versionID string) (*VersionPackage, error) {
+	listURL := fmt.Sprintf("https://bmclapi2.bangbang93.com/neoforge/list/%s", mcVersion)
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Get(listURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bmclapi neoforge returned status: %d", resp.StatusCode)
+	}
+
+	var list []struct {
+		Version       string `json:"version"`
+		InstallerPath string `json:"installerPath"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, fmt.Errorf("no neoforge build available for Minecraft %s", mcVersion)
+	}
+
+	neoVer := list[0].Version
+	installerURL := fmt.Sprintf("https://maven.neoforged.net/releases/net/neoforged/neoforge/%s/neoforge-%s-installer.jar", neoVer, neoVer)
+	mirrorURL := fmt.Sprintf("https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge/%s/neoforge-%s-installer.jar", neoVer, neoVer)
+
+	jarBytes, err := downloadWithFallback(installerURL, mirrorURL)
+	if err != nil {
+		return nil, err
+	}
+
+	zipReader, err := zip.NewReader(bytes.NewReader(jarBytes), int64(len(jarBytes)))
+	if err != nil {
+		return nil, err
+	}
+
+	var versionJsonBytes []byte
+	for _, f := range zipReader.File {
+		if f.Name == "version.json" {
+			rc, err := f.Open()
+			if err == nil {
+				versionJsonBytes, _ = io.ReadAll(rc)
+				_ = rc.Close()
+			}
+			break
+		}
+	}
+
+	if len(versionJsonBytes) == 0 {
+		return nil, fmt.Errorf("version.json not found in neoforge installer jar")
+	}
+
+	var rawMap map[string]any
+	if err := json.Unmarshal(versionJsonBytes, &rawMap); err == nil {
+		rawMap["id"] = versionID
+		rawMap["inheritsFrom"] = mcVersion
+		versionJsonBytes, _ = json.MarshalIndent(rawMap, "", "  ")
+	}
+
+	mcDir := platform.GetMinecraftDir()
+	savePath := filepath.Join(mcDir, "versions", versionID, versionID+".json")
+	_ = os.MkdirAll(filepath.Dir(savePath), 0755)
+	_ = os.WriteFile(savePath, versionJsonBytes, 0644)
+
+	var pkg VersionPackage
+	if err := json.Unmarshal(versionJsonBytes, &pkg); err != nil {
+		return nil, err
+	}
+	return &pkg, nil
+}
+
+func downloadWithFallback(primaryUrl, fallbackUrl string) ([]byte, error) {
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Get(primaryUrl)
+	if err == nil && resp.StatusCode == http.StatusOK {
+		defer resp.Body.Close()
+		return io.ReadAll(resp.Body)
+	}
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+
+	if fallbackUrl != "" {
+		respF, errF := client.Get(fallbackUrl)
+		if errF == nil && respF.StatusCode == http.StatusOK {
+			defer respF.Body.Close()
+			return io.ReadAll(respF.Body)
+		}
+		if respF != nil {
+			_ = respF.Body.Close()
+		}
+	}
+	return nil, fmt.Errorf("failed to download from primary and fallback URLs: %s", primaryUrl)
+}
+
+func resolveMavenDownloadUrl(lib LibraryEntry, relPath string) string {
+	slashRelPath := filepath.ToSlash(relPath)
+	if lib.URL != "" && (strings.HasPrefix(lib.URL, "http://") || strings.HasPrefix(lib.URL, "https://")) {
+		return strings.TrimRight(lib.URL, "/") + "/" + slashRelPath
+	}
+	if strings.Contains(lib.Name, "fabricmc") {
+		return "https://maven.fabricmc.net/" + slashRelPath
+	}
+	if strings.Contains(lib.Name, "minecraftforge") {
+		return "https://maven.minecraftforge.net/" + slashRelPath
+	}
+	if strings.Contains(lib.Name, "neoforged") {
+		return "https://maven.neoforged.net/releases/" + slashRelPath
+	}
+	return "https://libraries.minecraft.net/" + slashRelPath
 }
 
 func downloadSingleFile(url, destPath string) error {
