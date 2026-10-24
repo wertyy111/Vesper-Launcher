@@ -277,11 +277,199 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 			b.EmitSnapshot()
 		}()
 
+	case "shell.opensection":
+		if sec, ok := payload["section"].(string); ok && sec != "" {
+			b.state.SetSection(sec)
+		}
+		if tab, ok := payload["tabId"].(string); ok && tab != "" {
+			b.state.ActiveSettingsTab = tab
+		}
+		b.EmitSnapshot()
+
+	case "shell.closesection":
+		b.state.SetSection("none")
+		b.EmitSnapshot()
+
 	case "shell.navigate":
 		if sec, ok := payload["section"].(string); ok {
 			b.state.SetSection(sec)
 			b.EmitSnapshot()
 		}
+
+	case "settings.selecttab":
+		b.state.SetSection("settings")
+		if tab, ok := payload["tabId"].(string); ok && tab != "" {
+			b.state.ActiveSettingsTab = tab
+		}
+		b.EmitSnapshot()
+
+	case "settings.setmemory":
+		if val, ok := payload["value"].(float64); ok && val > 0 {
+			b.state.JavaMemoryMb = int(val)
+			b.state.Save()
+			b.EmitSnapshot()
+		}
+
+	case "settings.settoggle":
+		field, _ := payload["field"].(string)
+		val, _ := payload["value"].(bool)
+		switch field {
+		case "autoMinimizeOnLaunch", "autoCloseOnLaunch":
+			b.state.AutoClose = val
+		}
+		b.state.Save()
+		b.EmitSnapshot()
+
+	case "settings.settext":
+		field, _ := payload["field"].(string)
+		val, _ := payload["value"].(string)
+		switch field {
+		case "javaPath":
+			b.state.JavaPath = val
+		case "extraJvmArgs", "jvmArgs":
+			b.state.JvmArgs = val
+		}
+		b.state.Save()
+		b.EmitSnapshot()
+
+	case "settings.setoption":
+		field, _ := payload["field"].(string)
+		val, _ := payload["value"].(string)
+		switch field {
+		case "minecraftLanguageCode":
+			b.state.LanguageCode = val
+		}
+		b.state.Save()
+		b.EmitSnapshot()
+
+	case "settings.opengamedirectory":
+		mcDir := platform.GetMinecraftDir()
+		openFolderInExplorer(mcDir)
+
+	case "skin.importdialog":
+		go func() {
+			if b.ctx == nil {
+				return
+			}
+			filePath, err := wailsRuntime.OpenFileDialog(b.ctx, wailsRuntime.OpenDialogOptions{
+				Title: "Выберите скин (.png)",
+				Filters: []wailsRuntime.FileFilter{
+					{DisplayName: "Изображение скина (*.png)", Pattern: "*.png"},
+				},
+			})
+			if err == nil && filePath != "" {
+				b.state.CurrentSkinUrl = filePath
+				b.state.Save()
+				b.EmitSnapshot()
+			}
+		}()
+
+	case "skin.openfolder":
+		skinsDir := filepath.Join(platform.GetMinecraftDir(), "skins")
+		_ = os.MkdirAll(skinsDir, 0755)
+		openFolderInExplorer(skinsDir)
+
+	case "skin.clear":
+		b.state.CurrentSkinUrl = "/assets/steve.png"
+		b.state.Save()
+		b.EmitSnapshot()
+
+	case "skin.setmodel":
+		if m, ok := payload["modelId"].(string); ok && m != "" {
+			b.state.SkinModel = m
+			b.state.Save()
+			b.EmitSnapshot()
+		}
+
+	case "skin.selectfile":
+		if fn, ok := payload["fileName"].(string); ok && fn != "" {
+			b.state.CurrentSkinUrl = fn
+			b.state.Save()
+			b.EmitSnapshot()
+		}
+
+	case "background.openfolder":
+		openFolderInExplorer(platform.GetMinecraftDir())
+
+	case "background.reset":
+		b.state.SetBackground("/assets/bg-day.png")
+		b.EmitSnapshot()
+
+	case "background.setpreset":
+		if fn, ok := payload["fileName"].(string); ok && fn != "" {
+			b.state.SetBackground("/assets/" + fn)
+			b.EmitSnapshot()
+		}
+
+	case "account.setmode":
+		b.state.SetSection("account")
+		b.EmitSnapshot()
+
+	case "account.selectrecentusername":
+		if u, ok := payload["username"].(string); ok && u != "" {
+			b.state.SetNickname(u)
+			b.EmitSnapshot()
+		}
+
+	case "account.pickavatar":
+		go func() {
+			if b.ctx == nil {
+				return
+			}
+			filePath, err := wailsRuntime.OpenFileDialog(b.ctx, wailsRuntime.OpenDialogOptions{
+				Title: "Выберите аватар (*.png, *.jpg)",
+				Filters: []wailsRuntime.FileFilter{
+					{DisplayName: "Изображение (*.png;*.jpg;*.webp)", Pattern: "*.png;*.jpg;*.jpeg;*.webp"},
+				},
+			})
+			if err == nil && filePath != "" {
+				b.state.AvatarUrl = filePath
+				b.state.Save()
+				b.EmitSnapshot()
+			}
+		}()
+
+	case "friends.setnickname":
+		// Friend search/draft
+		b.EmitSnapshot()
+
+	case "friends.add":
+		b.state.SetStatus("Запрос в друзья отправлен", "", 0, false)
+		b.EmitSnapshot()
+
+	case "friends.respond":
+		b.EmitSnapshot()
+
+	case "friends.remove":
+		b.EmitSnapshot()
+
+	case "mods.toggleitem":
+		if pid, ok := payload["projectId"].(string); ok && pid != "" {
+			for i, it := range b.state.ModItems {
+				if it.ProjectId == pid {
+					b.state.ModItems[i].IsInstalled = !it.IsInstalled
+					if b.state.ModItems[i].IsInstalled {
+						b.state.ModItems[i].ActionText = "Удалить"
+					} else {
+						b.state.ModItems[i].ActionText = "Установить"
+					}
+					break
+				}
+			}
+			b.EmitSnapshot()
+		}
+
+	case "mods.togglefavorite":
+		b.EmitSnapshot()
+
+	case "mods.setselectedprojects":
+		b.EmitSnapshot()
+
+	case "client.uiready":
+		b.EmitSnapshot()
+
+	case "updates.install":
+		_ = browser.OpenURL("https://github.com/wertyy111/Updates-Vesper/releases/latest")
 
 	case "settings.update":
 		if mem, ok := payload["javaMemoryMb"].(float64); ok && mem > 0 {

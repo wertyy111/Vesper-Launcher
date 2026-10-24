@@ -32,6 +32,7 @@ type LauncherState struct {
 	JavaPath          string
 	JvmArgs           string
 	LanguageCode      string
+	SkinModel         string
 	AutoClose         bool
 	CurrentBgUrl      string
 	CurrentSkinUrl    string
@@ -49,13 +50,14 @@ type LauncherState struct {
 func NewLauncherState() *LauncherState {
 	s := &LauncherState{
 		ActiveSection:     "none",
-		ActiveSettingsTab: "common",
+		ActiveSettingsTab: "launcher",
 		Nickname:          "Steve",
 		StatusText:        "Готов к запуску",
 		SelectedVersion:   "1.21.4",
 		JavaMemoryMb:      4096,
 		LanguageCode:      "ru_ru",
 		CurrentSkinUrl:    "/assets/steve.png",
+		SkinModel:         "auto",
 		SelectedCategory:  "Моды",
 		ModProvider:       "modrinth",
 		Updates: models.UpdatesSnapshot{
@@ -145,23 +147,64 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 				Versions:                 s.Versions,
 			},
 			Account: models.AccountSnapshot{
-				CurrentNickname: s.Nickname,
-				AvatarUrl:       s.AvatarUrl,
-				HasAccount:      s.HasAccount,
-				AccountType:     s.AccountType,
+				Mode:                    "login",
+				AccountStateText:        "Сессия не активна",
+				CurrentNickname:         s.Nickname,
+				AvatarUrl:               s.AvatarUrl,
+				AvatarPlaceholder:       "/assets/steve.png",
+				HasAccount:              s.HasAccount,
+				HasAuthenticatedSession: s.HasAccount,
+				AccountType:             s.AccountType,
+				RecentUsernames:         []string{s.Nickname},
+				CanChangeAvatar:         s.HasAccount,
 			},
 			Settings: models.SettingsSnapshot{
-				MinecraftLanguageCode: s.LanguageCode,
-				JavaMemoryMb:          s.JavaMemoryMb,
-				JavaPath:              s.JavaPath,
-				JvmArgs:               s.JvmArgs,
-				AutoCloseOnLaunch:     s.AutoClose,
+				ActiveTab:                    s.ActiveSettingsTab,
+				MemoryMb:                     s.JavaMemoryMb,
+				DisplayedMemoryMb:            s.JavaMemoryMb,
+				MinimumMemoryMb:              1024,
+				MaximumMemoryMb:              12288,
+				JavaMemoryMb:                 s.JavaMemoryMb,
+				JavaPath:                     s.JavaPath,
+				EffectiveJavaPath:            s.JavaPath,
+				JvmArgs:                      s.JvmArgs,
+				ExtraJvmArgs:                 s.JvmArgs,
+				ShowJvmArgs:                  true,
+				AutoOptimizeMemory:           false,
+				AutoMinimizeOnLaunch:         false,
+				AutoCloseOnLaunch:            s.AutoClose,
+				RestoreLauncherAfterGameExit: true,
+				ClickSoundEnabled:            true,
+				JavaRuntimeMode:              "auto",
+				JavaModeHint:                 "Лаунчер автоматически скачает совместимую Java Temurin (OpenJDK) для запуска выбранной версии Minecraft.",
+				AutoMemoryHint:               "Память задана вручную.",
+				AutoMinimizeHint:             "Будет скрыт после запуска игры.",
+				RestoreHint:                  "Лаунчер восстановится после завершения игры.",
+				JvmArgsHint:                  "Поле открыто.",
+				MinecraftLanguageCode:        s.LanguageCode,
+				DisplayedGameDirectory:       platform.GetMinecraftDir(),
+				LanguageOptions: []map[string]string{
+					{"id": "auto", "label": "Авто"},
+					{"id": "ru_ru", "label": "Русский"},
+					{"id": "en_us", "label": "English"},
+				},
 			},
 			Skin: models.SkinSnapshot{
-				CurrentSkinUrl: s.CurrentSkinUrl,
+				CurrentSkinUrl:     s.CurrentSkinUrl,
+				SelectedSkinUrl:    s.CurrentSkinUrl,
+				SelectedSkinIsSlim: false,
+				ModelPreferenceId:  s.SkinModel,
+				SelectedSkinLabel:  "Стандартный скин",
 			},
 			Background: models.BackgroundSnapshot{
-				CurrentBgUrl: s.CurrentBgUrl,
+				CurrentBgUrl:         s.CurrentBgUrl,
+				AppliedBackgroundUrl: s.CurrentBgUrl,
+				Items: []models.BackgroundItem{
+					{FileName: "bg-day.png", Label: "День", Url: "/assets/bg-day.png", IsActive: s.CurrentBgUrl == "/assets/bg-day.png"},
+					{FileName: "bg-night.png", Label: "Ночь", Url: "/assets/bg-night.png", IsActive: s.CurrentBgUrl == "/assets/bg-night.png"},
+					{FileName: "bg-sunrise.png", Label: "Рассвет", Url: "/assets/bg-sunrise.png", IsActive: s.CurrentBgUrl == "/assets/bg-sunrise.png"},
+					{FileName: "bg-sunset.png", Label: "Закат", Url: "/assets/bg-sunset.png", IsActive: s.CurrentBgUrl == "/assets/bg-sunset.png"},
+				},
 			},
 			Mods: models.ModsSnapshot{
 				Provider:         s.ModProvider,
@@ -172,8 +215,13 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 				CatalogSummary:   "Популярные модификации для Minecraft",
 			},
 			Friends: models.FriendsSnapshot{
-				Friends:          s.Friends,
-				IncomingRequests: s.FriendRequests,
+				ProfileAvatarUrl:         s.AvatarUrl,
+				ProfileAvatarPlaceholder: "/assets/steve.png",
+				ProfileNickname:          s.Nickname,
+				ProfileType:              "Тип: " + s.AccountType,
+				CanManage:                s.HasAccount,
+				Friends:                  s.Friends,
+				IncomingRequests:         s.FriendRequests,
 			},
 		},
 	}

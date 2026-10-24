@@ -22,22 +22,22 @@ type UpdateProgress struct {
 }
 
 type LauncherSnapshot struct {
-	ActiveSection     string                 `json:"activeSection"`
-	ActiveSettingsTab string                 `json:"activeSettingsTab"`
-	IsBusy            bool                   `json:"isBusy"`
-	IsGameRunning     bool                   `json:"isGameRunning"`
-	CanAccessFriends  bool                   `json:"canAccessFriends"`
-	NotificationsCount int                   `json:"notificationsCount"`
-	Notifications     []map[string]any       `json:"notifications"`
-	Updates           UpdatesSnapshot        `json:"updates"`
-	Theme             ThemeSnapshot          `json:"theme"`
-	Main              MainSnapshot           `json:"main"`
-	Account           AccountSnapshot        `json:"account"`
-	Settings          SettingsSnapshot       `json:"settings"`
-	Skin              SkinSnapshot           `json:"skin"`
-	Background        BackgroundSnapshot     `json:"background"`
-	Mods              ModsSnapshot           `json:"mods"`
-	Friends           FriendsSnapshot        `json:"friends"`
+	ActiveSection      string             `json:"activeSection"`
+	ActiveSettingsTab  string             `json:"activeSettingsTab"`
+	IsBusy             bool               `json:"isBusy"`
+	IsGameRunning      bool               `json:"isGameRunning"`
+	CanAccessFriends   bool               `json:"canAccessFriends"`
+	NotificationsCount int                `json:"notificationsCount"`
+	Notifications      []map[string]any   `json:"notifications"`
+	Updates            UpdatesSnapshot    `json:"updates"`
+	Theme              ThemeSnapshot      `json:"theme"`
+	Main               MainSnapshot       `json:"main"`
+	Account            AccountSnapshot    `json:"account"`
+	Settings           SettingsSnapshot   `json:"settings"`
+	Skin               SkinSnapshot       `json:"skin"`
+	Background         BackgroundSnapshot `json:"background"`
+	Mods               ModsSnapshot       `json:"mods"`
+	Friends            FriendsSnapshot    `json:"friends"`
 }
 
 type UpdatesSnapshot struct {
@@ -68,40 +68,79 @@ type VersionOption struct {
 }
 
 type MainSnapshot struct {
-	Nickname                  string          `json:"nickname"`
-	StatusText                string          `json:"statusText"`
-	ProgressText              string          `json:"progressText"`
-	ProgressOverlayText       string          `json:"progressOverlayText"`
-	ProgressPercent           float64         `json:"progressPercent"`
-	IsProgressIndeterminate   bool            `json:"isProgressIndeterminate"`
-	LaunchButtonText          string          `json:"launchButtonText"`
-	IsVersionOperationActive  bool            `json:"isVersionOperationActive"`
-	SelectedVersionKey        string          `json:"selectedVersionKey"`
-	InlineVersionLabel        string          `json:"inlineVersionLabel"`
-	Versions                  []VersionOption `json:"versions"`
+	Nickname                 string          `json:"nickname"`
+	StatusText               string          `json:"statusText"`
+	ProgressText             string          `json:"progressText"`
+	ProgressOverlayText      string          `json:"progressOverlayText"`
+	ProgressPercent          float64         `json:"progressPercent"`
+	IsProgressIndeterminate  bool            `json:"isProgressIndeterminate"`
+	LaunchButtonText         string          `json:"launchButtonText"`
+	IsVersionOperationActive bool            `json:"isVersionOperationActive"`
+	SelectedVersionKey       string          `json:"selectedVersionKey"`
+	InlineVersionLabel       string          `json:"inlineVersionLabel"`
+	Versions                 []VersionOption `json:"versions"`
 }
 
 type AccountSnapshot struct {
-	CurrentNickname string `json:"currentNickname"`
-	AvatarUrl       string `json:"avatarUrl"`
-	HasAccount      bool   `json:"hasAccount"`
-	AccountType     string `json:"accountType"`
+	Mode                    string   `json:"mode"`
+	AccountStateText        string   `json:"accountStateText"`
+	CurrentNickname         string   `json:"currentNickname"`
+	AvatarUrl               string   `json:"avatarUrl"`
+	AvatarPlaceholder       string   `json:"avatarPlaceholder"`
+	HasAccount              bool     `json:"hasAccount"`
+	HasAuthenticatedSession bool     `json:"hasAuthenticatedSession"`
+	AccountType             string   `json:"accountType"`
+	RecentUsernames         []string `json:"recentUsernames"`
+	CanChangeAvatar         bool     `json:"canChangeAvatar"`
 }
 
 type SettingsSnapshot struct {
-	MinecraftLanguageCode string `json:"minecraftLanguageCode"`
-	JavaMemoryMb          int    `json:"javaMemoryMb"`
-	JavaPath              string `json:"javaPath"`
-	JvmArgs               string `json:"jvmArgs"`
-	AutoCloseOnLaunch     bool   `json:"autoCloseOnLaunch"`
+	ActiveTab                    string              `json:"activeTab"`
+	MemoryMb                     int                 `json:"memoryMb"`
+	DisplayedMemoryMb            int                 `json:"displayedMemoryMb"`
+	MinimumMemoryMb              int                 `json:"minimumMemoryMb"`
+	MaximumMemoryMb              int                 `json:"maximumMemoryMb"`
+	JavaMemoryMb                 int                 `json:"javaMemoryMb"`
+	JavaPath                     string              `json:"javaPath"`
+	EffectiveJavaPath            string              `json:"effectiveJavaPath"`
+	JvmArgs                      string              `json:"jvmArgs"`
+	ExtraJvmArgs                 string              `json:"extraJvmArgs"`
+	ShowJvmArgs                  bool                `json:"showJvmArgs"`
+	AutoOptimizeMemory           bool                `json:"autoOptimizeMemory"`
+	AutoMinimizeOnLaunch         bool                `json:"autoMinimizeOnLaunch"`
+	AutoCloseOnLaunch            bool                `json:"autoCloseOnLaunch"`
+	RestoreLauncherAfterGameExit bool                `json:"restoreLauncherAfterGameExit"`
+	ClickSoundEnabled            bool                `json:"clickSoundEnabled"`
+	JavaRuntimeMode              string              `json:"javaRuntimeMode"`
+	JavaModeHint                 string              `json:"javaModeHint"`
+	AutoMemoryHint               string              `json:"autoMemoryHint"`
+	AutoMinimizeHint             string              `json:"autoMinimizeHint"`
+	RestoreHint                  string              `json:"restoreHint"`
+	JvmArgsHint                  string              `json:"jvmArgsHint"`
+	MinecraftLanguageCode        string              `json:"minecraftLanguageCode"`
+	DisplayedGameDirectory       string              `json:"displayedGameDirectory"`
+	LanguageOptions              []map[string]string `json:"languageOptions"`
 }
 
 type SkinSnapshot struct {
-	CurrentSkinUrl string `json:"currentSkinUrl"`
+	CurrentSkinUrl     string `json:"currentSkinUrl"`
+	SelectedSkinUrl    string `json:"selectedSkinUrl"`
+	SelectedSkinIsSlim bool   `json:"selectedSkinIsSlim"`
+	ModelPreferenceId  string `json:"modelPreferenceId"`
+	SelectedSkinLabel  string `json:"selectedSkinLabel"`
+}
+
+type BackgroundItem struct {
+	FileName string `json:"fileName"`
+	Label    string `json:"label"`
+	Url      string `json:"url"`
+	IsActive bool   `json:"isActive"`
 }
 
 type BackgroundSnapshot struct {
-	CurrentBgUrl string `json:"currentBgUrl"`
+	CurrentBgUrl         string           `json:"currentBgUrl"`
+	AppliedBackgroundUrl string           `json:"appliedBackgroundUrl"`
+	Items                []BackgroundItem `json:"items"`
 }
 
 type ModItem struct {
@@ -136,6 +175,7 @@ type ModsSnapshot struct {
 type FriendEntry struct {
 	ID        string `json:"id"`
 	Nickname  string `json:"nickname"`
+	Username  string `json:"username"`
 	AvatarUrl string `json:"avatarUrl"`
 	Status    string `json:"status"`
 	GameInfo  string `json:"gameInfo"`
@@ -147,14 +187,20 @@ type FriendRequest struct {
 	ID        string `json:"id"`
 	FromUser  string `json:"fromUser"`
 	Sender    string `json:"sender"`
+	Username  string `json:"username"`
 	AvatarUrl string `json:"avatarUrl"`
 	CreatedAt string `json:"createdAt"`
 	SentTime  string `json:"sentTime"`
 }
 
 type FriendsSnapshot struct {
-	Friends          []FriendEntry   `json:"friends"`
-	IncomingRequests []FriendRequest `json:"incomingRequests"`
+	ProfileAvatarUrl         string          `json:"profileAvatarUrl"`
+	ProfileAvatarPlaceholder string          `json:"profileAvatarPlaceholder"`
+	ProfileNickname          string          `json:"profileNickname"`
+	ProfileType              string          `json:"profileType"`
+	CanManage                bool            `json:"canManage"`
+	Friends                  []FriendEntry   `json:"friends"`
+	IncomingRequests         []FriendRequest `json:"incomingRequests"`
 }
 
 type WindowState struct {

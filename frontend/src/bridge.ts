@@ -41,7 +41,7 @@ class PhotinoBridge {
       return;
     }
 
-    void this.sendMessageToHost(message);
+    void this.sendMessageToHost(message, command, payload);
   }
 
   private ensureInitialized() {
@@ -66,21 +66,45 @@ class PhotinoBridge {
     }) as EventListener);
     window.chrome?.webview?.addEventListener?.('message', (event) => this.dispatchRawMessage(event.data));
 
-    // Wails v2 runtime integration
-    const wailsRuntime = (window as any).runtime;
-    if (wailsRuntime?.EventsOn) {
-      wailsRuntime.EventsOn('vesper:message', (data: any) => this.dispatchRawMessage(data));
-      wailsRuntime.EventsOn('snapshot', (data: any) => this.dispatchRawMessage({ type: 'snapshot', data }));
+    // Wails v2 runtime integration with retry loop to handle async runtime initialization
+    const tryBindWails = () => {
+      const wailsRuntime = (window as any).runtime;
+      if (wailsRuntime?.EventsOn) {
+        wailsRuntime.EventsOn('vesper:message', (data: any) => this.dispatchRawMessage(data));
+        wailsRuntime.EventsOn('snapshot', (data: any) => this.dispatchRawMessage({ type: 'snapshot', data }));
+        return true;
+      }
+      return false;
+    };
+
+    if (!tryBindWails()) {
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if (tryBindWails() || attempts > 60) {
+          clearInterval(interval);
+        }
+      }, 50);
     }
   }
 
-  private async sendMessageToHost(message: string) {
+  private async sendMessageToHost(message: string, command: string, payload: Record<string, unknown>) {
     const wailsApp = (window as any).go?.main?.App;
+    if (wailsApp?.SendCommand) {
+      try {
+        await wailsApp.SendCommand(command, payload);
+        return;
+      } catch (err) {
+        console.warn('Wails SendCommand failed:', err);
+      }
+    }
     if (wailsApp?.SendMessage) {
       try {
-        wailsApp.SendMessage(message);
+        await wailsApp.SendMessage(message);
         return;
-      } catch {}
+      } catch (err) {
+        console.warn('Wails SendMessage failed:', err);
+      }
     }
 
     const wailsRuntime = (window as any).runtime;
@@ -89,7 +113,9 @@ class PhotinoBridge {
         const parsed = JSON.parse(message);
         wailsRuntime.EventsEmit('vesper:command', parsed);
         return;
-      } catch {}
+      } catch (err) {
+        console.warn('Wails EventsEmit failed:', err);
+      }
     }
 
     if (await this.trySendHttpBridgeMessage(message)) {
