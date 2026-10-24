@@ -17,8 +17,8 @@ const (
 	DefaultWindowHeight = 760
 	MinWindowWidth      = 900
 	MinWindowHeight     = 580
-	MaxWindowWidth      = 1920
-	MaxWindowHeight     = 1080
+	MaxWindowWidth      = 3840
+	MaxWindowHeight     = 2160
 )
 
 type LauncherState struct {

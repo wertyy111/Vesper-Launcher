@@ -5,11 +5,13 @@ export function AvatarImage({
   placeholder,
   alt,
   className,
+  style,
 }: {
   url?: unknown;
   placeholder?: unknown;
   alt: string;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   const cleanAlt = typeof alt === 'string' ? alt.trim() : '';
 
@@ -80,18 +82,9 @@ export function AvatarImage({
     ? placeholder.trim().slice(0, 2).toUpperCase()
     : (cleanAlt ? cleanAlt.slice(0, 2).toUpperCase() : 'AV');
 
-  const containerStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    objectFit: 'cover',
-  };
-
   if (hasError || !currentSrc) {
     return (
-      <span className={className} style={containerStyle}>
+      <span className={className} style={style}>
         {initials}
       </span>
     );
@@ -104,7 +97,7 @@ export function AvatarImage({
       alt={cleanAlt}
       loading="lazy"
       decoding="async"
-      style={containerStyle}
+      style={style}
       onError={handleError}
     />
   );

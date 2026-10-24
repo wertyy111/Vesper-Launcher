@@ -19,6 +19,17 @@ import liquidGlScriptUrl from './vendor/liquidGL.js?url';
 
 const RESIZE_DIRECTIONS = ['top', 'right', 'bottom', 'left', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
 
+const DIRECTION_TO_WAILS_EDGE: Record<string, string> = {
+  top: 'n-resize',
+  bottom: 's-resize',
+  left: 'w-resize',
+  right: 'e-resize',
+  'top-left': 'nw-resize',
+  'top-right': 'ne-resize',
+  'bottom-left': 'sw-resize',
+  'bottom-right': 'se-resize',
+};
+
 const BOTTOM_SECTION_ITEMS = [
   { id: 'skin', label: 'Скин' },
   { id: 'background', label: 'Фон' },
@@ -149,8 +160,8 @@ function App() {
         const h = Math.round(window.innerHeight);
         // Do not save maximized, fullscreen, or unconstrained dimensions
         if (
-          w < 900 || w > 1920 ||
-          h < 580 || h > 1080 ||
+          w < 900 || w > 3840 ||
+          h < 580 || h > 2160 ||
           w >= (window.screen.availWidth - 60) ||
           h >= (window.screen.availHeight - 60)
         ) {
@@ -542,8 +553,19 @@ function App() {
 
   const startWindowResize = (event: MouseEvent<HTMLElement>, direction: string) => {
     if (event.button !== 0) return;
+    const edge = DIRECTION_TO_WAILS_EDGE[direction];
+    const w = window as any;
+    if (edge) {
+      if (w.wails?.flags) {
+        w.wails.flags.resizeEdge = edge;
+      }
+      if (typeof w.WailsInvoke === 'function') {
+        event.preventDefault();
+        w.WailsInvoke(`resize:${edge}`);
+        return;
+      }
+    }
     event.preventDefault();
-    event.stopPropagation();
     photinoBridge.sendCommand('host.startResize', { direction });
   };
 
@@ -634,6 +656,19 @@ function App() {
               key={direction}
               className={`window-resize-zone resize-${direction}`}
               onMouseDown={(event) => startWindowResize(event, direction)}
+              onMouseEnter={() => {
+                const w = window as any;
+                const edge = DIRECTION_TO_WAILS_EDGE[direction];
+                if (w.wails?.flags && edge) {
+                  w.wails.flags.resizeEdge = edge;
+                }
+              }}
+              onMouseLeave={() => {
+                const w = window as any;
+                if (w.wails?.flags) {
+                  w.wails.flags.resizeEdge = undefined;
+                }
+              }}
               aria-hidden="true"
             />
           ))}

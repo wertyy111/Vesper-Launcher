@@ -132,14 +132,14 @@ img {
 .window-resize-zone {
   z-index:9999;
   pointer-events:auto;
-  background:#00000003;
+  background:transparent;
   position:absolute
 }
 .resize-top,.resize-bottom {
   cursor:ns-resize;
-  height:7px;
-  left:10px;
-  right:10px
+  height:10px;
+  left:14px;
+  right:14px
 }
 .resize-top {
   top:0
@@ -149,9 +149,9 @@ img {
 }
 .resize-left,.resize-right {
   cursor:ew-resize;
-  width:7px;
-  top:10px;
-  bottom:10px
+  width:10px;
+  top:14px;
+  bottom:14px
 }
 .resize-left {
   left:0
@@ -160,8 +160,8 @@ img {
   right:0
 }
 .resize-top-left,.resize-top-right,.resize-bottom-left,.resize-bottom-right {
-  width:14px;
-  height:14px
+  width:20px;
+  height:20px
 }
 .resize-top-left {
   cursor:nwse-resize;
@@ -2078,7 +2078,10 @@ to {
 .avatar-placeholder.hero,.avatar-preview {
   border-radius:16px;
   width:72px;
-  height:72px
+  height:72px;
+  max-width:72px;
+  max-height:72px;
+  flex-shrink:0
 }
 .account-avatar-summary {
   border-radius:14px;
