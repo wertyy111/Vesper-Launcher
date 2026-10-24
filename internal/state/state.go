@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,7 +57,7 @@ func NewLauncherState() *LauncherState {
 	s := &LauncherState{
 		ActiveSection:           "none",
 		ActiveSettingsTab:       "launcher",
-		Nickname:                "Steve",
+		Nickname:                "",
 		StatusText:              "Готов к запуску",
 		SelectedVersion:         "1.21.4",
 		JavaMemoryMb:            4096,
@@ -156,18 +157,39 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 				InlineVersionLabel:       inlineLabel,
 				Versions:                 s.Versions,
 			},
-			Account: models.AccountSnapshot{
-				Mode:                    "login",
-				AccountStateText:        "Сессия не активна",
-				CurrentNickname:         s.Nickname,
-				AvatarUrl:               s.AvatarUrl,
-				AvatarPlaceholder:       "/assets/steve.png",
-				HasAccount:              s.HasAccount,
-				HasAuthenticatedSession: s.HasAccount,
-				AccountType:             s.AccountType,
-				RecentUsernames:         []string{s.Nickname},
-				CanChangeAvatar:         s.HasAccount,
-			},
+			Account: func() models.AccountSnapshot {
+				accountMode := "login"
+				accountStateText := "Сессия не активна."
+				if s.HasAccount {
+					accountMode = "summary"
+					accountStateText = "Облачная сессия активна."
+				}
+				avatarPlaceholder := "AV"
+				nickTrim := strings.TrimSpace(s.Nickname)
+				if len(nickTrim) >= 2 {
+					avatarPlaceholder = strings.ToUpper(nickTrim[:2])
+				} else if len(nickTrim) == 1 {
+					avatarPlaceholder = strings.ToUpper(nickTrim)
+				}
+				var recentUsers []string
+				if nickTrim != "" {
+					recentUsers = []string{nickTrim}
+				} else {
+					recentUsers = []string{}
+				}
+				return models.AccountSnapshot{
+					Mode:                    accountMode,
+					AccountStateText:        accountStateText,
+					CurrentNickname:         nickTrim,
+					AvatarUrl:               s.AvatarUrl,
+					AvatarPlaceholder:       avatarPlaceholder,
+					HasAccount:              s.HasAccount,
+					HasAuthenticatedSession: s.HasAccount,
+					AccountType:             s.AccountType,
+					RecentUsernames:         recentUsers,
+					CanChangeAvatar:         s.HasAccount,
+				}
+			}(),
 			Settings: models.SettingsSnapshot{
 				ActiveTab:                    s.ActiveSettingsTab,
 				MemoryMb:                     s.JavaMemoryMb,
@@ -357,7 +379,7 @@ func (s *LauncherState) Load() {
 
 	var data serializedState
 	if err := json.Unmarshal(bytes, &data); err == nil {
-		if data.Nickname != "" {
+		if data.Nickname != "" && data.Nickname != "Steve" {
 			s.Nickname = data.Nickname
 		}
 		if data.SelectedVersion != "" {

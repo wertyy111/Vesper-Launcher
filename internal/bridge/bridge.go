@@ -222,12 +222,12 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 				b.state.SetStatus("Регистрация в Vesper...", "", 0, true)
 				b.EmitSnapshot()
 				if err := b.account.Register(username, password); err != nil {
-					b.state.SetStatus("Ошибка регистрации: "+err.Error(), "", 0, false)
+					b.state.SetStatus(err.Error(), "Проверьте введённые данные.", 0, false)
 				} else {
 					b.state.SetNickname(username)
 					b.state.SetAuth(true, "vesper", username, "")
 					b.state.SetSection("none")
-					b.state.SetStatus("Аккаунт создан", "", 0, false)
+					b.state.SetStatus("Аккаунт создан: "+username, "Аккаунт Vesper подключен.", 0, false)
 				}
 				b.EmitSnapshot()
 			}()
@@ -236,12 +236,12 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 				b.state.SetStatus("Вход в аккаунт Vesper...", "", 0, true)
 				b.EmitSnapshot()
 				if err := b.account.Login(username, password); err != nil {
-					b.state.SetStatus("Ошибка входа: "+err.Error(), "", 0, false)
+					b.state.SetStatus(err.Error(), "Проверьте ник, пароль или доступность сервера.", 0, false)
 				} else {
 					b.state.SetNickname(username)
 					b.state.SetAuth(true, "vesper", username, "")
 					b.state.SetSection("none")
-					b.state.SetStatus("Вход выполнен", "", 0, false)
+					b.state.SetStatus("Вход выполнен: "+username, "Аккаунт Vesper подключен.", 0, false)
 				}
 				b.EmitSnapshot()
 			}()
@@ -250,14 +250,15 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 			b.state.SetNickname(username)
 			b.state.SetAuth(false, "offline", username, "/assets/steve.png")
 			b.state.SetSection("none")
-			b.state.SetStatus("Офлайн режим", "", 0, false)
+			b.state.SetStatus("Офлайн режим: "+username, "", 0, false)
 			b.EmitSnapshot()
 		}
 
 	case "account.logout":
 		b.account.Logout()
-		b.state.SetNickname("Steve")
-		b.state.SetAuth(false, "offline", "Steve", "/assets/steve.png")
+		b.state.SetNickname("")
+		b.state.SetAuth(false, "offline", "", "/assets/steve.png")
+		b.state.SetStatus("Вы вышли из аккаунта", "Сессия сброшена.", 0, false)
 		b.EmitSnapshot()
 
 	case "account.microsoft":
@@ -556,9 +557,13 @@ func (b *BridgeService) handleLaunch() {
 	b.EmitSnapshot()
 
 	go func() {
+		nick := strings.TrimSpace(b.state.Nickname)
+		if nick == "" {
+			nick = "Player"
+		}
 		opts := minecraft.LaunchOptions{
 			VersionID:  b.state.SelectedVersion,
-			Nickname:   b.state.Nickname,
+			Nickname:   nick,
 			MemoryMb:   b.state.JavaMemoryMb,
 			CustomJava: b.state.JavaPath,
 			CustomJvm:  b.state.JvmArgs,

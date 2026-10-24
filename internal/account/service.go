@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,7 +52,6 @@ func NewVesperAccountService(onSyncUpdate func(string, string, []models.FriendEn
 }
 
 func (s *VesperAccountService) loadConfig() {
-	// Look for account-sync.json
 	b, err := os.ReadFile("account-sync.json")
 	if err == nil {
 		_ = json.Unmarshal(b, &s.config)
@@ -79,6 +79,9 @@ func (s *VesperAccountService) loadState() {
 		HasAuth      bool   `json:"hasAuth"`
 	}
 	if err := json.Unmarshal(b, &data); err == nil && data.SessionToken != "" {
+		if data.Nickname == "Steve" {
+			data.Nickname = ""
+		}
 		s.nickname = data.Nickname
 		s.sessionToken = data.SessionToken
 		s.hasAuth = data.HasAuth
@@ -108,31 +111,103 @@ func (s *VesperAccountService) GetNickname() string {
 	return s.nickname
 }
 
+func (s *VesperAccountService) GetAvatarUrl() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.avatarUrl
+}
+
+func extractToken(jsonBytes []byte) string {
+	var root map[string]any
+	if err := json.Unmarshal(jsonBytes, &root); err != nil {
+		return ""
+	}
+	candidates := []string{"accessToken", "token", "access_token", "sessionToken"}
+	for _, k := range candidates {
+		if val, ok := root[k].(string); ok && strings.TrimSpace(val) != "" {
+			return strings.TrimSpace(val)
+		}
+	}
+	subContainers := []string{"session", "data", "auth", "result", "user"}
+	for _, sub := range subContainers {
+		if subObj, ok := root[sub].(map[string]any); ok {
+			for _, k := range candidates {
+				if val, ok := subObj[k].(string); ok && strings.TrimSpace(val) != "" {
+					return strings.TrimSpace(val)
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func extractErrorMessage(jsonBytes []byte) string {
+	var root map[string]any
+	if err := json.Unmarshal(jsonBytes, &root); err != nil {
+		return ""
+	}
+	candidates := []string{"message", "error", "detail"}
+	for _, k := range candidates {
+		if val, ok := root[k].(string); ok && strings.TrimSpace(val) != "" {
+			msg := strings.TrimSpace(val)
+			lower := strings.ToLower(msg)
+			switch {
+			case strings.Contains(lower, "account not found"):
+				return "Аккаунт не найден"
+			case strings.Contains(lower, "invalid credentials"):
+				return "Неверный логин или пароль"
+			case strings.Contains(lower, "username and password are required"):
+				return "Введите ник и пароль"
+			case strings.Contains(lower, "already taken") || strings.Contains(lower, "already exists"):
+				return "Этот никнейм уже занят"
+			default:
+				return msg
+			}
+		}
+	}
+	return ""
+}
+
 func (s *VesperAccountService) Login(username, password string) error {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return fmt.Errorf("введите ник")
+	}
+	if password == "" {
+		return fmt.Errorf("введите пароль")
+	}
+
 	// 1. Fetch credential info (salt and iterations)
 	infoUrl := fmt.Sprintf("%s?username=%s", s.config.CredentialInfoUrl, url.QueryEscape(username))
 	resp, err := s.client.Get(infoUrl)
 	if err != nil {
-		return fmt.Errorf("failed to reach account server: %w", err)
+		return fmt.Errorf("сервер авторизации недоступен")
 	}
 	defer resp.Body.Close()
 
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("аккаунт '%s' не найден", username)
+	}
 	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("account not found or server error (%s): %s", resp.Status, string(b))
+		errMsg := extractErrorMessage(bodyBytes)
+		if errMsg == "" {
+			errMsg = fmt.Sprintf("код %d", resp.StatusCode)
+		}
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	var credInfo struct {
 		PasswordSalt       string `json:"passwordSalt"`
 		PasswordIterations int    `json:"passwordIterations"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&credInfo); err != nil || credInfo.PasswordSalt == "" {
-		return fmt.Errorf("invalid credential info response from server")
+	if err := json.Unmarshal(bodyBytes, &credInfo); err != nil || credInfo.PasswordSalt == "" {
+		return fmt.Errorf("неверный ответ сервера авторизации")
 	}
 
 	saltBytes, err := hex.DecodeString(credInfo.PasswordSalt)
 	if err != nil {
-		return fmt.Errorf("invalid salt format: %w", err)
+		return fmt.Errorf("ошибка формата данных авторизации")
 	}
 
 	iters := credInfo.PasswordIterations
@@ -152,38 +227,27 @@ func (s *VesperAccountService) Login(username, password string) error {
 	loginBytes, _ := json.Marshal(loginReq)
 	loginResp, err := s.client.Post(s.config.LoginUrl, "application/json", bytes.NewReader(loginBytes))
 	if err != nil {
-		return fmt.Errorf("login request failed: %w", err)
+		return fmt.Errorf("не удалось отправить запрос на вход")
 	}
 	defer loginResp.Body.Close()
 
-	bodyBytes, _ := io.ReadAll(loginResp.Body)
+	loginBody, _ := io.ReadAll(loginResp.Body)
 	if loginResp.StatusCode != http.StatusOK {
-		var errObj struct {
-			Message string `json:"message"`
-			Error   string `json:"error"`
+		errMsg := extractErrorMessage(loginBody)
+		if errMsg == "" {
+			errMsg = fmt.Sprintf("ошибка входа (код %d)", loginResp.StatusCode)
 		}
-		_ = json.Unmarshal(bodyBytes, &errObj)
-		msg := errObj.Message
-		if msg == "" {
-			msg = errObj.Error
-		}
-		if msg == "" {
-			msg = fmt.Sprintf("HTTP %d", loginResp.StatusCode)
-		}
-		return fmt.Errorf("login rejected: %s", msg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
-	var tokenObj struct {
-		Token string `json:"token"`
-	}
-	_ = json.Unmarshal(bodyBytes, &tokenObj)
-	if tokenObj.Token == "" {
-		return fmt.Errorf("no session token returned")
+	token := extractToken(loginBody)
+	if token == "" {
+		return fmt.Errorf("сервер не вернул токен сессии")
 	}
 
 	s.mu.Lock()
 	s.nickname = username
-	s.sessionToken = tokenObj.Token
+	s.sessionToken = token
 	s.hasAuth = true
 	s.saveState()
 	s.mu.Unlock()
@@ -193,6 +257,14 @@ func (s *VesperAccountService) Login(username, password string) error {
 }
 
 func (s *VesperAccountService) Register(username, password string) error {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return fmt.Errorf("введите ник")
+	}
+	if password == "" {
+		return fmt.Errorf("введите пароль")
+	}
+
 	saltBytes := make([]byte, 16)
 	_, _ = rand.Read(saltBytes)
 	saltHex := hex.EncodeToString(saltBytes)
@@ -210,38 +282,27 @@ func (s *VesperAccountService) Register(username, password string) error {
 	regBytes, _ := json.Marshal(regReq)
 	regResp, err := s.client.Post(s.config.RegisterUrl, "application/json", bytes.NewReader(regBytes))
 	if err != nil {
-		return fmt.Errorf("register request failed: %w", err)
+		return fmt.Errorf("не удалось отправить запрос на регистрацию")
 	}
 	defer regResp.Body.Close()
 
-	bodyBytes, _ := io.ReadAll(regResp.Body)
+	regBody, _ := io.ReadAll(regResp.Body)
 	if regResp.StatusCode != http.StatusOK && regResp.StatusCode != http.StatusCreated {
-		var errObj struct {
-			Message string `json:"message"`
-			Error   string `json:"error"`
+		errMsg := extractErrorMessage(regBody)
+		if errMsg == "" {
+			errMsg = fmt.Sprintf("ошибка регистрации (код %d)", regResp.StatusCode)
 		}
-		_ = json.Unmarshal(bodyBytes, &errObj)
-		msg := errObj.Message
-		if msg == "" {
-			msg = errObj.Error
-		}
-		if msg == "" {
-			msg = fmt.Sprintf("HTTP %d", regResp.StatusCode)
-		}
-		return fmt.Errorf("registration failed: %s", msg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
-	var tokenObj struct {
-		Token string `json:"token"`
-	}
-	_ = json.Unmarshal(bodyBytes, &tokenObj)
-	if tokenObj.Token == "" {
-		return fmt.Errorf("no session token returned after registration")
+	token := extractToken(regBody)
+	if token == "" {
+		return fmt.Errorf("сервер не вернул токен сессии")
 	}
 
 	s.mu.Lock()
 	s.nickname = username
-	s.sessionToken = tokenObj.Token
+	s.sessionToken = token
 	s.hasAuth = true
 	s.saveState()
 	s.mu.Unlock()
@@ -254,6 +315,8 @@ func (s *VesperAccountService) Logout() {
 	s.mu.Lock()
 	token := s.sessionToken
 	s.sessionToken = ""
+	s.nickname = ""
+	s.avatarUrl = ""
 	s.hasAuth = false
 	s.saveState()
 	s.mu.Unlock()
@@ -274,67 +337,99 @@ func (s *VesperAccountService) RefreshSync(ctx context.Context) {
 		return
 	}
 
-	req, _ := http.NewRequestWithContext(ctx, "GET", s.config.MeUrl, nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return
+	// 1. Fetch user profile and avatar
+	req, err := http.NewRequestWithContext(ctx, "GET", s.config.MeUrl, nil)
+	if err == nil {
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, errDo := s.client.Do(req)
+		if errDo == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				body, _ := io.ReadAll(resp.Body)
+				var profileData struct {
+					User struct {
+						Username string `json:"username"`
+					} `json:"user"`
+					Avatar any `json:"avatar"`
+				}
+				if json.Unmarshal(body, &profileData) == nil {
+					avatarStr := ""
+					if str, ok := profileData.Avatar.(string); ok {
+						avatarStr = str
+					} else if m, ok := profileData.Avatar.(map[string]any); ok {
+						if u, ok := m["url"].(string); ok {
+							avatarStr = u
+						}
+					}
+					s.mu.Lock()
+					if profileData.User.Username != "" {
+						s.nickname = profileData.User.Username
+					}
+					s.avatarUrl = avatarStr
+					s.mu.Unlock()
+				}
+			}
+		}
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return
-	}
-
-	var meResp struct {
-		User struct {
-			Username  string `json:"username"`
-			AvatarUrl string `json:"avatarUrl"`
-		} `json:"user"`
-		Friends []struct {
-			ID       string `json:"id"`
-			Username string `json:"username"`
-			IsOnline bool   `json:"isOnline"`
-			Server   string `json:"server"`
-		} `json:"friends"`
-		FriendRequests []struct {
-			ID       string `json:"id"`
-			Sender   string `json:"sender"`
-			SentTime string `json:"sentTime"`
-		} `json:"friendRequests"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&meResp); err != nil {
-		return
-	}
-
-	s.mu.Lock()
-	if meResp.User.AvatarUrl != "" {
-		s.avatarUrl = meResp.User.AvatarUrl
-	}
-	s.mu.Unlock()
-
+	// 2. Fetch friends list
+	baseMe, errBase := url.Parse(s.config.MeUrl)
 	var friendEntries []models.FriendEntry
-	for _, f := range meResp.Friends {
-		friendEntries = append(friendEntries, models.FriendEntry{
-			ID:       f.ID,
-			Nickname: f.Username,
-			IsOnline: f.IsOnline,
-			Server:   f.Server,
-		})
-	}
-
 	var reqEntries []models.FriendRequest
-	for _, r := range meResp.FriendRequests {
-		reqEntries = append(reqEntries, models.FriendRequest{
-			ID:       r.ID,
-			Sender:   r.Sender,
-			SentTime: r.SentTime,
-		})
+	if errBase == nil {
+		baseMe.Path = "/api/v1/friends"
+		friendsUrl := baseMe.String()
+		fReq, errFReq := http.NewRequestWithContext(ctx, "GET", friendsUrl, nil)
+		if errFReq == nil {
+			fReq.Header.Set("Authorization", "Bearer "+token)
+			fResp, errFDo := s.client.Do(fReq)
+			if errFDo == nil {
+				defer fResp.Body.Close()
+				if fResp.StatusCode == http.StatusOK {
+					fBody, _ := io.ReadAll(fResp.Body)
+					var fData struct {
+						Friends []struct {
+							ID       any    `json:"id"`
+							Username string `json:"username"`
+							IsOnline bool   `json:"isOnline"`
+							Server   string `json:"server"`
+						} `json:"friends"`
+						IncomingRequests []struct {
+							ID   any `json:"id"`
+							User struct {
+								Username string `json:"username"`
+							} `json:"user"`
+							CreatedAtUtc string `json:"createdAtUtc"`
+						} `json:"incomingRequests"`
+					}
+					if json.Unmarshal(fBody, &fData) == nil {
+						for _, f := range fData.Friends {
+							friendEntries = append(friendEntries, models.FriendEntry{
+								ID:       fmt.Sprintf("%v", f.ID),
+								Nickname: f.Username,
+								IsOnline: f.IsOnline,
+								Server:   f.Server,
+							})
+						}
+						for _, r := range fData.IncomingRequests {
+							reqEntries = append(reqEntries, models.FriendRequest{
+								ID:       fmt.Sprintf("%v", r.ID),
+								Sender:   r.User.Username,
+								SentTime: r.CreatedAtUtc,
+							})
+						}
+					}
+				}
+			}
+		}
 	}
 
 	if s.onSyncUpdate != nil {
-		s.onSyncUpdate(s.nickname, s.avatarUrl, friendEntries, reqEntries)
+		s.mu.RLock()
+		nick := s.nickname
+		avatar := s.avatarUrl
+		s.mu.RUnlock()
+		s.onSyncUpdate(nick, avatar, friendEntries, reqEntries)
 	}
 }
 

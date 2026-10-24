@@ -52,7 +52,7 @@ func main() {
 		StartHidden:       false,
 		HideWindowOnClose: false,
 		BackgroundColour:  &options.RGBA{R: 10, G: 17, B: 24, A: 255},
-		LogLevel:          logger.DEBUG,
+		LogLevel:          logger.ERROR,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
