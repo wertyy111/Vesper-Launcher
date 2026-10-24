@@ -43,7 +43,7 @@ const DEFAULT_GLASS_TUNING: GlassTuningSettings = {
   bevelDepth: 0.02,
   bevelWidth: 0.15,
   frost: 0,
-  resolution: 3
+  resolution: 1.5
 };
 
 function App() {
@@ -126,8 +126,6 @@ function App() {
 
   useEffect(() => {
     photinoBridge.requestSnapshot();
-    const intervalId = window.setInterval(() => photinoBridge.requestSnapshot(), 1200);
-    return () => window.clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
@@ -305,7 +303,9 @@ function App() {
       document.body.appendChild(script);
     });
 
+    let initTimeout: number | undefined;
     const initializeLiquidSettingsButton = async () => {
+      if (cancelled) return;
       try {
         await loadScript(html2canvasScriptUrl, 'html2canvas');
         await loadScript(liquidGlScriptUrl, 'liquidgl');
@@ -348,7 +348,6 @@ function App() {
           magnify: 1
         });
 
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 650));
         markClientUiReady();
       } catch (error) {
         console.warn('liquidGL controls test failed', error);
@@ -356,27 +355,32 @@ function App() {
       }
     };
 
+    const debouncedInit = () => {
+      window.clearTimeout(initTimeout);
+      initTimeout = window.setTimeout(initializeLiquidSettingsButton, 100);
+    };
+
     initializeLiquidSettingsButton();
-    window.addEventListener('vesper-layout-change', initializeLiquidSettingsButton);
-    const observer = new MutationObserver(() => {
-      if (document.querySelectorAll('.liquid-glass-layer:not([data-liquid-initialized])').length > 0) {
-        initializeLiquidSettingsButton();
+    window.addEventListener('vesper-layout-change', debouncedInit);
+    const observer = new MutationObserver((mutations) => {
+      const hasAddedNodes = mutations.some((m) => m.addedNodes.length > 0);
+      if (hasAddedNodes && document.querySelectorAll('.liquid-glass-layer:not([data-liquid-initialized])').length > 0) {
+        debouncedInit();
       }
     });
     observer.observe(document.body, {
       childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class', 'style', 'aria-hidden']
+      subtree: true
     });
 
     return () => {
       cancelled = true;
       window.clearTimeout(readyFallbackId);
-      window.removeEventListener('vesper-layout-change', initializeLiquidSettingsButton);
+      window.clearTimeout(initTimeout);
+      window.removeEventListener('vesper-layout-change', debouncedInit);
       observer.disconnect();
     };
-  }, [loadingState, activeSection, versionMenuOpen]);
+  }, [loadingState]);
 
   useEffect(() => {
     const renderer = (window as any).__liquidGLRenderer__;
@@ -457,12 +461,22 @@ function App() {
   }, [pageBackground, theme.backgroundUrl]);
 
   const openSection = (sectionId: string) => {
-    if (!launcher) return;
-    if (launcher.activeSection === sectionId) {
+    const nextSection = launcher?.activeSection === sectionId ? 'none' : sectionId;
+    setHostSnapshot((prev) => {
+      if (!prev || !prev.launcher) return prev;
+      return {
+        ...prev,
+        launcher: {
+          ...prev.launcher,
+          activeSection: nextSection
+        }
+      };
+    });
+    if (nextSection === 'none') {
       photinoBridge.sendCommand('shell.closeSection');
-      return;
+    } else {
+      photinoBridge.sendCommand('shell.openSection', { section: sectionId });
     }
-    photinoBridge.sendCommand('shell.openSection', { section: sectionId });
   };
 
   const handleActionClick = (action: () => void) => (event: MouseEvent<HTMLElement>) => {
@@ -700,6 +714,7 @@ function App() {
                                   const key = String(visibleVersionOptions[0].key ?? '');
                                   setVersionMenuOpen(false);
                                   setVersionSearch('');
+                                  setHostSnapshot((prev) => (prev && prev.launcher ? { ...prev, launcher: { ...prev.launcher, main: { ...prev.launcher.main, selectedVersionKey: key } } } : prev));
                                   photinoBridge.sendCommand('main.selectVersionKey', { key });
                                 }
                               }}
@@ -746,6 +761,7 @@ function App() {
                                     onClick={handleActionClick(() => {
                                       setVersionMenuOpen(false);
                                       setVersionSearch('');
+                                      setHostSnapshot((prev) => (prev && prev.launcher ? { ...prev, launcher: { ...prev.launcher, main: { ...prev.launcher.main, selectedVersionKey: key } } } : prev));
                                       photinoBridge.sendCommand('main.selectVersionKey', { key });
                                     })}
                                   >

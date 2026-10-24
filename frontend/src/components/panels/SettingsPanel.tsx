@@ -46,7 +46,8 @@ function SettingsYesNoToggle({ label, hint, checked, field }: { label: string; h
 
 export function SettingsPanel({ launcher, javaPathDraft, setJavaPathDraft, setJavaPathDirty, jvmArgsDraft, setJvmArgsDraft, setJvmArgsDirty, glassTuning, setGlassTuningValue }: PanelRenderProps) {
   const settings = launcher.settings;
-  const activeTab = settings.activeTab ?? 'launcher';
+  const [activeTabOverride, setActiveTabOverride] = useState<string | null>(null);
+  const activeTab = activeTabOverride ?? settings.activeTab ?? 'launcher';
   const [memoryDraftMb, setMemoryDraftMb] = useState<number | null>(null);
   const minimumMemoryMb = Number(settings.minimumMemoryMb ?? 2048);
   const maximumMemoryMb = Number(settings.maximumMemoryMb ?? 12288);
@@ -99,7 +100,15 @@ export function SettingsPanel({ launcher, javaPathDraft, setJavaPathDraft, setJa
       <section className="wpf-section-shell settings-shell">
         <div className="tab-row compact wpf-tabs">
           {SETTINGS_TAB_ITEMS.map((tab) => (
-            <button key={tab.id} className={`tab-button left-liquid-glass-button settings-liquid-glass-button ${activeTab === tab.id ? 'active' : ''}`} onClick={() => photinoBridge.sendCommand('settings.selectTab', { tabId: tab.id })} type="button">
+            <button
+              key={tab.id}
+              className={`tab-button left-liquid-glass-button settings-liquid-glass-button ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTabOverride(tab.id);
+                photinoBridge.sendCommand('settings.selectTab', { tabId: tab.id });
+              }}
+              type="button"
+            >
               <span className="settings-liquid-glass-layer liquid-glass-layer" aria-hidden="true" />
               <span className="left-liquid-glass-content">{tab.label}</span>
             </button>

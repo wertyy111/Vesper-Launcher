@@ -138,6 +138,14 @@
         this.captureSnapshot();
       }, 250);
       window.addEventListener("resize", onResize, { passive: true });
+      window.addEventListener(
+        "vesper-layout-change",
+        () => {
+          this.lenses.forEach((l) => l.updateMetrics(true));
+          this.render();
+        },
+        { passive: true }
+      );
 
       if ("ResizeObserver" in window) {
         new ResizeObserver(onResize).observe(this.snapshotTarget);
@@ -442,6 +450,46 @@
           this.canvas.style.visibility = "hidden";
           undos.push(() => (this.canvas.style.visibility = "visible"));
 
+          // Fast-path: If snapshotTarget has a background image, draw it directly to canvas in ~0.2ms!
+          const bgStyle = window.getComputedStyle(this.snapshotTarget).backgroundImage;
+          const match = bgStyle && bgStyle.match(/url\(["']?([^"')]+)["']?\)/);
+          if (match && match[1]) {
+            try {
+              const img = new Image();
+              img.crossOrigin = "anonymous";
+              img.src = match[1];
+              if (!img.complete) {
+                await new Promise((resolve) => {
+                  img.onload = () => resolve();
+                  img.onerror = () => resolve();
+                });
+              }
+              if (img.naturalWidth > 0) {
+                const snapCanvas = document.createElement("canvas");
+                snapCanvas.width = Math.round(fullW * scale);
+                snapCanvas.height = Math.round(fullH * scale);
+                const ctx = snapCanvas.getContext("2d");
+                if (ctx) {
+                  const imgAspect = img.naturalWidth / img.naturalHeight;
+                  const canvasAspect = snapCanvas.width / snapCanvas.height;
+                  let dw = snapCanvas.width, dh = snapCanvas.height, dx = 0, dy = 0;
+                  if (canvasAspect > imgAspect) {
+                    dh = snapCanvas.width / imgAspect;
+                    dy = (snapCanvas.height - dh) / 2;
+                  } else {
+                    dw = snapCanvas.height * imgAspect;
+                    dx = (snapCanvas.width - dw) / 2;
+                  }
+                  ctx.drawImage(img, dx, dy, dw, dh);
+                  this._uploadTexture(snapCanvas);
+                  return true;
+                }
+              }
+            } catch (fastErr) {
+              console.warn("fast background capture failed", fastErr);
+            }
+          }
+
           const lensElements = this.lenses
             .flatMap((lens) => [lens.el, lens._shadowEl])
             .filter(Boolean);
@@ -593,12 +641,28 @@
 
       this._updateDynamicNodes();
 
+      if (this.lenses.length > 0) {
+        this.lenses = this.lenses.filter((lens) => {
+          if (!lens.el || !lens.el.isConnected) {
+            lens.destroy?.();
+            return false;
+          }
+          return true;
+        });
+      }
+
+      const snapTargetRect = this.snapshotTarget
+        ? this.snapshotTarget.getBoundingClientRect()
+        : { left: 0, top: 0 };
+
       this.lenses.forEach((lens) => {
-        lens.updateMetrics();
+        if (lens._dirty) {
+          lens.updateMetrics();
+        }
         if (lens._mirrorActive && lens._mirrorClipUpdater) {
           lens._mirrorClipUpdater();
         }
-        this._renderLens(lens);
+        this._renderLens(lens, snapTargetRect);
       });
 
       this.lenses.forEach((ln) => {
@@ -645,7 +709,7 @@
     }
 
     /* ----------------------------- */
-    _renderLens(lens) {
+    _renderLens(lens, snapTargetRect) {
       const gl = this.gl;
       const rect = lens.rectPx;
       if (!rect) return;
@@ -669,8 +733,13 @@
       gl.viewport(x, y, w, h);
       gl.uniform2f(this.u.res, w, h);
 
-      const docX = rect.left - this.snapshotTarget.getBoundingClientRect().left;
-      const docY = rect.top - this.snapshotTarget.getBoundingClientRect().top;
+      const targetRect =
+        snapTargetRect ||
+        (this.snapshotTarget
+          ? this.snapshotTarget.getBoundingClientRect()
+          : { left: 0, top: 0 });
+      const docX = rect.left - targetRect.left;
+      const docY = rect.top - targetRect.top;
       const leftUV = (docX * this.scaleFactor) / this.textureWidth;
       const topUV = (docY * this.scaleFactor) / this.textureHeight;
       const wUV = (rect.width * this.scaleFactor) / this.textureWidth;
@@ -1399,14 +1468,15 @@
       this.el.style.background = "transparent";
 
       this.el.style.pointerEvents = "none";
+      this._dirty = true;
 
-      this.updateMetrics();
+      this.updateMetrics(true);
       this.setShadow(this.options.shadow);
       if (this.options.tilt) this._bindTiltHandlers();
 
       if (typeof ResizeObserver !== "undefined" && !this._sizeObs) {
         this._sizeObs = new ResizeObserver(() => {
-          this.updateMetrics();
+          this.updateMetrics(true);
           this.renderer.render();
         });
         this._sizeObs.observe(this.el);
@@ -1414,7 +1484,26 @@
     }
 
     /* ----------------------------- */
-    updateMetrics() {
+    destroy() {
+      if (this._sizeObs) {
+        this._sizeObs.disconnect();
+        this._sizeObs = null;
+      }
+      if (this._shadowEl) {
+        this._shadowEl.remove();
+        this._shadowEl = null;
+      }
+      this._destroyMirrorCanvas();
+    }
+
+    /* ----------------------------- */
+    updateMetrics(force = false) {
+      if (!this.el || !this.el.isConnected) return;
+      if (!force && !this._dirty && this.rectPx) {
+        return;
+      }
+      this._dirty = false;
+
       const rect =
         this._mirrorActive && this._baseRect
           ? this._baseRect

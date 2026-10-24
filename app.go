@@ -41,9 +41,9 @@ func (a *App) startup(ctx context.Context) {
 		}
 	})
 
-	// Periodic snapshot refresh
+	// Periodic heartbeat snapshot refresh (only as fallback, real events push immediately)
 	go func() {
-		ticker := time.NewTicker(1200 * time.Millisecond)
+		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
