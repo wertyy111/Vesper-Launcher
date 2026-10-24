@@ -178,24 +178,32 @@ type ModsSnapshot struct {
 }
 
 type FriendEntry struct {
-	ID        string `json:"id"`
-	Nickname  string `json:"nickname"`
-	Username  string `json:"username"`
-	AvatarUrl string `json:"avatarUrl"`
-	Status    string `json:"status"`
-	GameInfo  string `json:"gameInfo"`
-	IsOnline  bool   `json:"isOnline"`
-	Server    string `json:"server"`
+	ID                string `json:"id"`
+	Nickname          string `json:"nickname"`
+	Username          string `json:"username"`
+	AvatarUrl         string `json:"avatarUrl"`
+	AvatarPlaceholder string `json:"avatarPlaceholder"`
+	Status            string `json:"status"`
+	GameInfo          string `json:"gameInfo"`
+	IsOnline          bool   `json:"isOnline"`
+	PresenceText      string `json:"presenceText"`
+	ActivityText      string `json:"activityText"`
+	VersionText       string `json:"versionText"`
+	JoinAddressText   string `json:"joinAddressText"`
+	CanConnect        bool   `json:"canConnect"`
+	RelayRoomId       string `json:"relayRoomId"`
+	Server            string `json:"server"`
 }
 
 type FriendRequest struct {
-	ID        string `json:"id"`
-	FromUser  string `json:"fromUser"`
-	Sender    string `json:"sender"`
-	Username  string `json:"username"`
-	AvatarUrl string `json:"avatarUrl"`
-	CreatedAt string `json:"createdAt"`
-	SentTime  string `json:"sentTime"`
+	ID                string `json:"id"`
+	FromUser          string `json:"fromUser"`
+	Sender            string `json:"sender"`
+	Username          string `json:"username"`
+	AvatarUrl         string `json:"avatarUrl"`
+	AvatarPlaceholder string `json:"avatarPlaceholder"`
+	CreatedAt         string `json:"createdAt"`
+	SentTime          string `json:"sentTime"`
 }
 
 type FriendsSnapshot struct {

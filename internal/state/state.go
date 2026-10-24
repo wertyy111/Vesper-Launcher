@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	DefaultWindowWidth  = 1020
-	DefaultWindowHeight = 640
+	DefaultWindowWidth  = 1166
+	DefaultWindowHeight = 716
 	MinWindowWidth      = 900
 	MinWindowHeight     = 600
-	MaxWindowWidth      = 1400
-	MaxWindowHeight     = 860
+	MaxWindowWidth      = 1600
+	MaxWindowHeight     = 1000
 )
 
 type LauncherState struct {
@@ -173,13 +173,8 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 					accountMode = "summary"
 					accountStateText = "Облачная сессия активна."
 				}
-				avatarPlaceholder := "AV"
+				avatarPlaceholder := s.buildAvatarPlaceholder()
 				nickTrim := strings.TrimSpace(s.Nickname)
-				if len(nickTrim) >= 2 {
-					avatarPlaceholder = strings.ToUpper(nickTrim[:2])
-				} else if len(nickTrim) == 1 {
-					avatarPlaceholder = strings.ToUpper(nickTrim)
-				}
 				var recentUsers []string
 				if nickTrim != "" {
 					recentUsers = []string{nickTrim}
@@ -271,7 +266,7 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 			},
 			Friends: models.FriendsSnapshot{
 				ProfileAvatarUrl:         s.AvatarUrl,
-				ProfileAvatarPlaceholder: "/assets/steve.png",
+				ProfileAvatarPlaceholder: s.buildAvatarPlaceholder(),
 				ProfileNickname:          s.Nickname,
 				ProfileType:              "Тип: " + s.AccountType,
 				CanManage:                s.HasAccount,
@@ -280,6 +275,16 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 			},
 		},
 	}
+}
+
+func (s *LauncherState) buildAvatarPlaceholder() string {
+	nickTrim := strings.TrimSpace(s.Nickname)
+	if len(nickTrim) >= 2 {
+		return strings.ToUpper(nickTrim[:2])
+	} else if len(nickTrim) == 1 {
+		return strings.ToUpper(nickTrim)
+	}
+	return "AV"
 }
 
 func (s *LauncherState) SetSection(section string) {
@@ -469,9 +474,9 @@ func (s *LauncherState) SetAuth(hasAuth bool, accountType, nick, avatar string) 
 	s.AccountType = accountType
 	if nick != "" {
 		s.Nickname = nick
+	} else if !hasAuth {
+		s.Nickname = ""
 	}
-	if avatar != "" {
-		s.AvatarUrl = avatar
-	}
+	s.AvatarUrl = avatar
 	s.Save()
 }

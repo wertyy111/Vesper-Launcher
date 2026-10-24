@@ -254,7 +254,7 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 		} else {
 			// Offline mode
 			b.state.SetNickname(username)
-			b.state.SetAuth(false, "offline", username, "/assets/steve.png")
+			b.state.SetAuth(false, "offline", username, "")
 			b.state.SetSection("none")
 			b.state.SetStatus("Офлайн режим: "+username, "", 0, false)
 			b.EmitSnapshot()
@@ -263,7 +263,7 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 	case "account.logout":
 		b.account.Logout()
 		b.state.SetNickname("")
-		b.state.SetAuth(false, "offline", "", "/assets/steve.png")
+		b.state.SetAuth(false, "offline", "", "")
 		b.state.SetStatus("Вы вышли из аккаунта", "Сессия сброшена.", 0, false)
 		b.EmitSnapshot()
 

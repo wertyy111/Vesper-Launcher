@@ -328,6 +328,43 @@ func (s *VesperAccountService) Logout() {
 	}
 }
 
+func extractAvatarUrl(avatar any) string {
+	if avatar == nil {
+		return ""
+	}
+	if str, ok := avatar.(string); ok {
+		return strings.TrimSpace(str)
+	}
+	m, ok := avatar.(map[string]any)
+	if !ok {
+		return ""
+	}
+	for _, k := range []string{"url", "imageUrl"} {
+		if u, ok := m[k].(string); ok && strings.TrimSpace(u) != "" {
+			return strings.TrimSpace(u)
+		}
+	}
+	if b64, ok := m["imageBase64"].(string); ok && strings.TrimSpace(b64) != "" {
+		ct := "image/png"
+		if c, ok := m["contentType"].(string); ok && strings.TrimSpace(c) != "" {
+			ct = strings.TrimSpace(c)
+		}
+		return fmt.Sprintf("data:%s;base64,%s", ct, strings.TrimSpace(b64))
+	}
+	return ""
+}
+
+func buildInitials(name string) string {
+	t := strings.TrimSpace(name)
+	if t == "" {
+		return "AV"
+	}
+	if len(t) >= 2 {
+		return strings.ToUpper(t[:2])
+	}
+	return strings.ToUpper(t)
+}
+
 func (s *VesperAccountService) RefreshSync(ctx context.Context) {
 	s.mu.RLock()
 	token := s.sessionToken
@@ -353,14 +390,7 @@ func (s *VesperAccountService) RefreshSync(ctx context.Context) {
 					Avatar any `json:"avatar"`
 				}
 				if json.Unmarshal(body, &profileData) == nil {
-					avatarStr := ""
-					if str, ok := profileData.Avatar.(string); ok {
-						avatarStr = str
-					} else if m, ok := profileData.Avatar.(map[string]any); ok {
-						if u, ok := m["url"].(string); ok {
-							avatarStr = u
-						}
-					}
+					avatarStr := extractAvatarUrl(profileData.Avatar)
 					s.mu.Lock()
 					if profileData.User.Username != "" {
 						s.nickname = profileData.User.Username
@@ -389,33 +419,90 @@ func (s *VesperAccountService) RefreshSync(ctx context.Context) {
 					fBody, _ := io.ReadAll(fResp.Body)
 					var fData struct {
 						Friends []struct {
-							ID       any    `json:"id"`
-							Username string `json:"username"`
-							IsOnline bool   `json:"isOnline"`
-							Server   string `json:"server"`
+							ID           any    `json:"id"`
+							Username     string `json:"username"`
+							IsOnline     bool   `json:"isOnline"`
+							ActivityKind string `json:"activityKind"`
+							ActivityName string `json:"activityName"`
+							VersionID    string `json:"versionId"`
+							Server       string `json:"server"`
+							JoinHost     string `json:"joinHost"`
+							JoinPort     any    `json:"joinPort"`
+							RelayRoomID  string `json:"relayRoomId"`
+							Avatar       any    `json:"avatar"`
 						} `json:"friends"`
 						IncomingRequests []struct {
 							ID   any `json:"id"`
 							User struct {
 								Username string `json:"username"`
+								Avatar   any    `json:"avatar"`
 							} `json:"user"`
 							CreatedAtUtc string `json:"createdAtUtc"`
 						} `json:"incomingRequests"`
 					}
 					if json.Unmarshal(fBody, &fData) == nil {
 						for _, f := range fData.Friends {
+							u := strings.TrimSpace(f.Username)
+							if u == "" {
+								u = "Unknown"
+							}
+							avatarUrl := extractAvatarUrl(f.Avatar)
+							placeholder := buildInitials(u)
+
+							presenceText := "Офлайн"
+							activityText := ""
+							joinAddr := ""
+							if f.JoinHost != "" {
+								if f.JoinPort != nil {
+									joinAddr = fmt.Sprintf("%s:%v", f.JoinHost, f.JoinPort)
+								} else {
+									joinAddr = f.JoinHost
+								}
+							}
+							if f.IsOnline {
+								presenceText = "В сети"
+								if f.ActivityKind == "game" {
+									presenceText = "В игре"
+									if f.ActivityName != "" {
+										activityText = "Играет в " + f.ActivityName
+									} else {
+										activityText = "Играет в Minecraft"
+									}
+								}
+							}
+
 							friendEntries = append(friendEntries, models.FriendEntry{
-								ID:       fmt.Sprintf("%v", f.ID),
-								Nickname: f.Username,
-								IsOnline: f.IsOnline,
-								Server:   f.Server,
+								ID:                fmt.Sprintf("%v", f.ID),
+								Nickname:          u,
+								Username:          u,
+								AvatarUrl:         avatarUrl,
+								AvatarPlaceholder: placeholder,
+								IsOnline:          f.IsOnline,
+								PresenceText:      presenceText,
+								ActivityText:      activityText,
+								VersionText:       f.VersionID,
+								JoinAddressText:   joinAddr,
+								CanConnect:        f.IsOnline && f.ActivityKind == "game",
+								Server:            f.Server,
+								RelayRoomId:       f.RelayRoomID,
 							})
 						}
 						for _, r := range fData.IncomingRequests {
+							u := strings.TrimSpace(r.User.Username)
+							if u == "" {
+								u = "Unknown"
+							}
+							avatarUrl := extractAvatarUrl(r.User.Avatar)
+							placeholder := buildInitials(u)
 							reqEntries = append(reqEntries, models.FriendRequest{
-								ID:       fmt.Sprintf("%v", r.ID),
-								Sender:   r.User.Username,
-								SentTime: r.CreatedAtUtc,
+								ID:                fmt.Sprintf("%v", r.ID),
+								Sender:            u,
+								Username:          u,
+								FromUser:          u,
+								AvatarUrl:         avatarUrl,
+								AvatarPlaceholder: placeholder,
+								SentTime:          r.CreatedAtUtc,
+								CreatedAt:         r.CreatedAtUtc,
 							})
 						}
 					}
