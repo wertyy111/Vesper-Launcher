@@ -59,7 +59,7 @@ func main() {
 		Frameless:         isFrameless,
 		StartHidden:       false,
 		HideWindowOnClose: false,
-		BackgroundColour:  &options.RGBA{R: 10, G: 17, B: 24, A: 255},
+		BackgroundColour:  &options.RGBA{R: 0, G: 0, B: 0, A: 0},
 		LogLevel:          logger.ERROR,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
@@ -77,12 +77,12 @@ func main() {
 		Mac: &mac.Options{
 			TitleBar:             mac.TitleBarDefault(),
 			WebviewIsTransparent: true,
-			WindowIsTranslucent:  false,
+			WindowIsTranslucent:  true,
 			DisableZoom:          true,
 		},
 		Linux: &linux.Options{
 			Icon:                nil,
-			WindowIsTranslucent: false,
+			WindowIsTranslucent: true,
 		},
 	})
 
