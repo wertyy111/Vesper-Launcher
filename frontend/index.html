@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vesper Launcher</title>
+    <script>
+      (function() {
+        var ua = (navigator.userAgent || '').toLowerCase();
+        var p = (navigator.platform || '').toLowerCase();
+        var isMac = ua.includes('macintosh') || ua.includes('mac os') || p.includes('mac');
+        var isLinux = ua.includes('linux') || p.includes('linux');
+        if (isMac) {
+          document.documentElement.classList.add('platform-macos');
+        } else if (isLinux) {
+          document.documentElement.classList.add('platform-linux');
+        } else {
+          document.documentElement.classList.add('platform-windows');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
