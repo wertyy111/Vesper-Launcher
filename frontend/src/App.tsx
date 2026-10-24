@@ -19,14 +19,6 @@ import liquidGlScriptUrl from './vendor/liquidGL.js?url';
 
 const RESIZE_DIRECTIONS = ['top', 'right', 'bottom', 'left', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
 
-const isNonWindows = typeof window !== 'undefined' && (
-  window.navigator.userAgent.toLowerCase().includes('linux') ||
-  window.navigator.userAgent.toLowerCase().includes('macintosh') ||
-  window.navigator.userAgent.toLowerCase().includes('mac os') ||
-  (window.navigator.platform?.toLowerCase() || '').includes('linux') ||
-  (window.navigator.platform?.toLowerCase() || '').includes('mac')
-);
-
 const BOTTOM_SECTION_ITEMS = [
   { id: 'skin', label: 'Скин' },
   { id: 'background', label: 'Фон' },
@@ -157,8 +149,8 @@ function App() {
         const h = Math.round(window.innerHeight);
         // Do not save maximized, fullscreen, or unconstrained dimensions
         if (
-          w < 900 || w > 1400 ||
-          h < 600 || h > 860 ||
+          w < 900 || w > 1920 ||
+          h < 580 || h > 1080 ||
           w >= (window.screen.availWidth - 60) ||
           h >= (window.screen.availHeight - 60)
         ) {
@@ -572,7 +564,7 @@ function App() {
     photinoBridge.sendCommand('mods.setSelectedProjects', { projectIds: Array.from(selected) });
   };
 
-  const versionOptions = (main.availableVersions ?? []) as Array<Record<string, any>>;
+  const versionOptions = (main.availableVersions ?? main.versions ?? []) as Array<Record<string, any>>;
   const selectedVersionKey = String(main.selectedVersionKey ?? '');
   const selectedVersion = versionOptions.find((entry) => String(entry.key ?? '') === selectedVersionKey);
   const selectedVersionLabel = selectedVersion?.displayName ?? main.inlineVersionLabel ?? 'Версия: не выбрана';
@@ -637,7 +629,7 @@ function App() {
         />
       ) : (
         <div className="launcher-frame">
-          {!isNonWindows && RESIZE_DIRECTIONS.map((direction) => (
+          {RESIZE_DIRECTIONS.map((direction) => (
             <span
               key={direction}
               className={`window-resize-zone resize-${direction}`}
@@ -672,21 +664,17 @@ function App() {
               <button className="title-account-button" onClick={handleActionClick(() => openSection('account'))} type="button">
                 {account.currentNickname || main.nickname || 'Создайте аккаунт'}
               </button>
-              {!isNonWindows && (
-                <>
-                  <button className="title-icon-button" onClick={handleActionClick(() => photinoBridge.sendCommand('host.minimize'))} type="button" title="Свернуть">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round">
-                      <line x1="4" y1="12" x2="20" y2="12" />
-                    </svg>
-                  </button>
-                  <button className="title-icon-button" onClick={handleActionClick(() => photinoBridge.sendCommand('host.close'))} type="button" title="Закрыть">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round">
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                    </svg>
-                  </button>
-                </>
-              )}
+              <button className="title-icon-button" onClick={handleActionClick(() => photinoBridge.sendCommand('host.minimize'))} type="button" title="Свернуть">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round">
+                  <line x1="4" y1="12" x2="20" y2="12" />
+                </svg>
+              </button>
+              <button className="title-icon-button" onClick={handleActionClick(() => photinoBridge.sendCommand('host.close'))} type="button" title="Закрыть">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round">
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                </svg>
+              </button>
             </div>
           </header>
 

@@ -184,6 +184,7 @@ img {
   right:0
 }
 .titlebar {
+  --wails-draggable: drag;
   z-index:220;
   -webkit-user-select:none;
   user-select:none;
@@ -196,6 +197,12 @@ img {
   padding:0 8px 0 12px;
   display:flex;
   position:relative
+}
+.titlebar button,
+.titlebar a,
+.titlebar input,
+.titlebar .titlebar-actions {
+  --wails-draggable: no-drag;
 }
 .titlebar-brand,.titlebar-actions {
   align-items:center;
@@ -4528,24 +4535,4 @@ to {
 }
 
 
-/* Linux / macOS: runs with standard native OS window frame.
-   App shell fills the client area cleanly, and redundant custom caption buttons / resize zones are hidden. */
-html.platform-linux #root,
-html.platform-macos #root,
-html.platform-linux .app-shell,
-html.platform-macos .app-shell,
-html.platform-linux .launcher-frame,
-html.platform-macos .launcher-frame,
-html.platform-linux body > canvas[data-liquid-ignore],
-html.platform-macos body > canvas[data-liquid-ignore] {
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
 
-html.platform-linux .titlebar .title-icon-button,
-html.platform-macos .titlebar .title-icon-button,
-html.platform-linux .window-resize-zone,
-html.platform-macos .window-resize-zone {
-  display: none !important;
-}

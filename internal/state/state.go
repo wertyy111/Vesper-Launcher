@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	DefaultWindowWidth  = 1166
-	DefaultWindowHeight = 716
+	DefaultWindowWidth  = 1200
+	DefaultWindowHeight = 760
 	MinWindowWidth      = 900
-	MinWindowHeight     = 600
-	MaxWindowWidth      = 1600
-	MaxWindowHeight     = 1000
+	MinWindowHeight     = 580
+	MaxWindowWidth      = 1920
+	MaxWindowHeight     = 1080
 )
 
 type LauncherState struct {
@@ -165,6 +165,7 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 				SelectedVersionKey:       s.SelectedVersion,
 				InlineVersionLabel:       inlineLabel,
 				Versions:                 s.Versions,
+				AvailableVersions:        s.Versions,
 			},
 			Account: func() models.AccountSnapshot {
 				accountMode := "login"

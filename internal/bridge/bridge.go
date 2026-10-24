@@ -73,7 +73,7 @@ func (b *BridgeService) initBackgroundTasks() {
 	b.EmitSnapshot()
 }
 
-func (b *BridgeService) refreshVersionCatalog() {
+func (b *BridgeService) buildVersionCatalog(manifest *minecraft.VersionManifestV2) []models.VersionOption {
 	mcDir := platform.GetMinecraftDir()
 	versionsDir := filepath.Join(mcDir, "versions")
 	installedMap := make(map[string]bool)
@@ -93,44 +93,60 @@ func (b *BridgeService) refreshVersionCatalog() {
 	installedMap["forgeoptifine 1.16.5"] = true
 
 	var catalog []models.VersionOption
-	// Add bundled / popular presets
+	seen := make(map[string]bool)
+
+	// Add bundled ForgeOptiFine 1.16.5
 	catalog = append(catalog, models.VersionOption{
 		Key:         "ForgeOptiFine 1.16.5",
 		DisplayName: "1.16.5 - Forge + OptiFine (Встроенная)",
 		Category:    "forge",
 		IsInstalled: true,
 	})
+	seen["forgeoptifine 1.16.5"] = true
 
-	// Add popular releases
-	popularReleases := []string{"1.21.4", "1.21.1", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.16.5", "1.12.2", "1.8.9"}
-	for _, rel := range popularReleases {
-		if rel == "1.16.5" {
-			continue // covered by ForgeOptiFine
+	// If we have a manifest, add official releases
+	if manifest != nil && len(manifest.Versions) > 0 {
+		for _, v := range manifest.Versions {
+			if v.Type != "release" {
+				continue
+			}
+			lower := strings.ToLower(v.ID)
+			if seen[lower] {
+				continue
+			}
+			seen[lower] = true
+			catalog = append(catalog, models.VersionOption{
+				Key:         v.ID,
+				DisplayName: v.ID + " - Ванильная",
+				Category:    "release",
+				IsInstalled: installedMap[lower],
+			})
 		}
-		isInst := installedMap[strings.ToLower(rel)]
-		catalog = append(catalog, models.VersionOption{
-			Key:         rel,
-			DisplayName: rel + " - Ванильная",
-			Category:    "release",
-			IsInstalled: isInst,
-		})
+	} else {
+		// Popular releases fallback
+		popularReleases := []string{"1.21.4", "1.21.3", "1.21.1", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.16.5", "1.12.2", "1.8.9"}
+		for _, rel := range popularReleases {
+			lower := strings.ToLower(rel)
+			if seen[lower] {
+				continue
+			}
+			seen[lower] = true
+			catalog = append(catalog, models.VersionOption{
+				Key:         rel,
+				DisplayName: rel + " - Ванильная",
+				Category:    "release",
+				IsInstalled: installedMap[lower],
+			})
+		}
 	}
 
-	// Also add any other installed custom versions
+	// Also add any other installed custom versions from ~/.minecraft/versions
 	if entries, err := os.ReadDir(versionsDir); err == nil {
 		for _, e := range entries {
 			name := e.Name()
-			if strings.EqualFold(name, "ForgeOptiFine 1.16.5") {
-				continue
-			}
-			isDup := false
-			for _, c := range catalog {
-				if strings.EqualFold(c.Key, name) {
-					isDup = true
-					break
-				}
-			}
-			if !isDup {
+			lower := strings.ToLower(name)
+			if !seen[lower] {
+				seen[lower] = true
 				catalog = append(catalog, models.VersionOption{
 					Key:         name,
 					DisplayName: name + " (Локальная)",
@@ -141,7 +157,32 @@ func (b *BridgeService) refreshVersionCatalog() {
 		}
 	}
 
+	return catalog
+}
+
+func (b *BridgeService) refreshVersionCatalog() {
+	// Try loading cached manifest immediately for instant rendering
+	cachePath := filepath.Join(platform.GetMinecraftDir(), "version_manifest_v2.json")
+	var initialManifest *minecraft.VersionManifestV2
+	if data, err := os.ReadFile(cachePath); err == nil {
+		var m minecraft.VersionManifestV2
+		if err := json.Unmarshal(data, &m); err == nil && len(m.Versions) > 0 {
+			initialManifest = &m
+		}
+	}
+
+	catalog := b.buildVersionCatalog(initialManifest)
 	b.state.SetVersionCatalog(catalog)
+
+	// Fetch fresh manifest from Mojang in background if needed
+	go func() {
+		manifest, err := minecraft.FetchMojangManifest()
+		if err == nil && manifest != nil && len(manifest.Versions) > 0 {
+			updated := b.buildVersionCatalog(manifest)
+			b.state.SetVersionCatalog(updated)
+			b.EmitSnapshot()
+		}
+	}()
 }
 
 func (b *BridgeService) searchMods(query, category, provider string) {

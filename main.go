@@ -16,7 +16,6 @@ import "C"
 
 import (
 	"embed"
-	"runtime"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/logger"
@@ -35,8 +34,8 @@ var assets embed.FS
 func main() {
 	app := NewApp()
 
-	// Frameless only on Windows (Linux and macOS use standard native OS window frame)
-	isFrameless := runtime.GOOS == "windows"
+	// Frameless window across platforms to remove native window decoration notch ("челка") and match Windows
+	isFrameless := true
 
 	width := app.state.WindowWidth
 	if width < state.MinWindowWidth || width > state.MaxWindowWidth {

@@ -79,6 +79,7 @@ type MainSnapshot struct {
 	SelectedVersionKey       string          `json:"selectedVersionKey"`
 	InlineVersionLabel       string          `json:"inlineVersionLabel"`
 	Versions                 []VersionOption `json:"versions"`
+	AvailableVersions        []VersionOption `json:"availableVersions"`
 }
 
 type AccountSnapshot struct {
