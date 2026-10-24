@@ -98,7 +98,7 @@ func (b *BridgeService) buildVersionCatalog(manifest *minecraft.VersionManifestV
 	// Add bundled ForgeOptiFine 1.16.5
 	catalog = append(catalog, models.VersionOption{
 		Key:         "ForgeOptiFine 1.16.5",
-		DisplayName: "1.16.5 - Forge + OptiFine (Встроенная)",
+		DisplayName: "1.16.5 - Forge + OptiFine",
 		Category:    "forge",
 		IsInstalled: true,
 	})
