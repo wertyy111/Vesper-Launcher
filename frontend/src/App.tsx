@@ -453,7 +453,8 @@ function App() {
     const rootEl = document.getElementById('root');
     if (rootEl) {
       rootEl.style.background = 'transparent';
-      rootEl.style.borderRadius = '20px';
+      const isLinux = document.documentElement.classList.contains('platform-linux');
+      rootEl.style.borderRadius = isLinux ? '0px' : '20px';
       rootEl.style.overflow = 'hidden';
     }
 
@@ -772,10 +773,22 @@ function App() {
                                   setVersionMenuOpen(false);
                                   setVersionSearch('');
                                 } else if (event.key === 'Enter' && visibleVersionOptions.length > 0) {
-                                  const key = String(visibleVersionOptions[0].key ?? '');
+                                  const target = visibleVersionOptions[0];
+                                  const key = String(target.key ?? '');
+                                  const isTargetInstalled = !!target.isInstalled;
                                   setVersionMenuOpen(false);
                                   setVersionSearch('');
-                                  setHostSnapshot((prev) => (prev && prev.launcher ? { ...prev, launcher: { ...prev.launcher, main: { ...prev.launcher.main, selectedVersionKey: key } } } : prev));
+                                  setHostSnapshot((prev) => (prev && prev.launcher ? {
+                                    ...prev,
+                                    launcher: {
+                                      ...prev.launcher,
+                                      main: {
+                                        ...prev.launcher.main,
+                                        selectedVersionKey: key,
+                                        launchButtonText: isTargetInstalled ? 'Играть' : 'Установить'
+                                      }
+                                    }
+                                  } : prev));
                                   photinoBridge.sendCommand('main.selectVersionKey', { key });
                                 }
                               }}
@@ -811,6 +824,7 @@ function App() {
                               {visibleVersionOptions.map((entry) => {
                                 const key = String(entry.key ?? '');
                                 const isSelected = key === selectedVersionKey;
+                                const isInstalled = !!entry.isInstalled;
 
                                 return (
                                   <button
@@ -822,18 +836,70 @@ function App() {
                                     onClick={handleActionClick(() => {
                                       setVersionMenuOpen(false);
                                       setVersionSearch('');
-                                      setHostSnapshot((prev) => (prev && prev.launcher ? { ...prev, launcher: { ...prev.launcher, main: { ...prev.launcher.main, selectedVersionKey: key } } } : prev));
+                                      setHostSnapshot((prev) => (prev && prev.launcher ? {
+                                        ...prev,
+                                        launcher: {
+                                          ...prev.launcher,
+                                          main: {
+                                            ...prev.launcher.main,
+                                            selectedVersionKey: key,
+                                            launchButtonText: isInstalled ? 'Играть' : 'Установить'
+                                          }
+                                        }
+                                      } : prev));
                                       photinoBridge.sendCommand('main.selectVersionKey', { key });
                                     })}
                                   >
-                                    <span className="version-picker-option-label">{entry.displayName}</span>
-                                    {isSelected ? (
-                                      <span className="version-picker-option-check" aria-hidden="true">
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                          <polyline points="5 12 10 17 19 7" />
-                                        </svg>
-                                      </span>
-                                    ) : null}
+                                    <span className="version-picker-option-label">
+                                      <span>{entry.displayName}</span>
+                                    </span>
+                                    <div className="version-picker-option-actions">
+                                      {isInstalled ? (
+                                        <button
+                                          className="version-delete-button"
+                                          type="button"
+                                          title="Удалить версию"
+                                          aria-label={`Удалить версию ${entry.displayName}`}
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            setHostSnapshot((prev) => {
+                                              if (!prev?.launcher?.main?.versions) return prev;
+                                              const updated = prev.launcher.main.versions.map((opt: any) =>
+                                                String(opt.key) === key ? { ...opt, isInstalled: false } : opt
+                                              );
+                                              const isCurrent = key === prev.launcher.main.selectedVersionKey;
+                                              return {
+                                                ...prev,
+                                                launcher: {
+                                                  ...prev.launcher,
+                                                  main: {
+                                                    ...prev.launcher.main,
+                                                    versions: updated,
+                                                    availableVersions: updated,
+                                                    launchButtonText: isCurrent ? 'Установить' : prev.launcher.main.launchButtonText
+                                                  }
+                                                }
+                                              };
+                                            });
+                                            photinoBridge.sendCommand('main.deleteVersion', { key });
+                                          }}
+                                        >
+                                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="3 6 5 6 21 6" />
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                            <line x1="10" y1="11" x2="10" y2="17" />
+                                            <line x1="14" y1="11" x2="14" y2="17" />
+                                          </svg>
+                                        </button>
+                                      ) : null}
+                                      {isSelected ? (
+                                        <span className="version-picker-option-check" aria-hidden="true">
+                                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="5 12 10 17 19 7" />
+                                          </svg>
+                                        </span>
+                                      ) : null}
+                                    </div>
                                   </button>
                                 );
                               })}
@@ -868,20 +934,30 @@ function App() {
                       </div>
 
                       <div className="classic-inline-row launch-row-classic">
-                        <button
-                          className={`main-glass-button launch-button-classic left-liquid-glass-button ${isVersionOperationActive ? 'is-busy' : ''}`}
-                          data-liquid-label={main.launchButtonText || 'Играть'}
-                          onClick={handleActionClick(() => photinoBridge.sendCommand('main.launch'))}
-                          type="button"
-                          disabled={isVersionOperationActive}
-                        >
-                          <span className="left-liquid-glass-layer liquid-glass-layer" aria-hidden="true" />
-                          <span className={`launch-button-progress ${isProgressIndeterminate ? 'indeterminate' : ''}`} style={progressFillStyle} />
-                          <span className="left-liquid-glass-content launch-button-content">
-                            {isVersionOperationActive ? <span className="launch-operation-spinner" aria-hidden="true" /> : null}
-                            <span>{main.launchButtonText || 'Играть'}</span>
-                          </span>
-                        </button>
+                        {(() => {
+                          const selectedOption = (main.versions || []).find((v: any) => v.key === selectedVersionKey);
+                          const isInstalled = selectedOption ? !!selectedOption.isInstalled : false;
+                          const launchText = isVersionOperationActive
+                            ? (isInstalled ? 'Запуск...' : 'Установка...')
+                            : (main.launchButtonText || (isInstalled ? 'Играть' : 'Установить'));
+
+                          return (
+                            <button
+                              className={`main-glass-button launch-button-classic left-liquid-glass-button ${isVersionOperationActive ? 'is-busy' : ''}`}
+                              data-liquid-label={launchText}
+                              onClick={handleActionClick(() => photinoBridge.sendCommand('main.launch'))}
+                              type="button"
+                              disabled={isVersionOperationActive}
+                            >
+                              <span className="left-liquid-glass-layer liquid-glass-layer" aria-hidden="true" />
+                              <span className={`launch-button-progress ${isProgressIndeterminate ? 'indeterminate' : ''}`} style={progressFillStyle} />
+                              <span className="left-liquid-glass-content launch-button-content">
+                                {isVersionOperationActive ? <span className="launch-operation-spinner" aria-hidden="true" /> : null}
+                                <span>{launchText}</span>
+                              </span>
+                            </button>
+                          );
+                        })()}
                         <button ref={settingsLiquidButtonRef} className="input-icon-button settings-liquid-button left-liquid-glass-button" data-liquid-ignore="" data-liquid-icon={'*'} onClick={handleActionClick(() => openSection('settings'))} type="button" title="Настройки">
                           <span className="settings-liquid-glass-test left-liquid-glass-layer liquid-glass-layer" aria-hidden="true" />
                           <span className="safe-icon settings-liquid-button-icon left-liquid-glass-content">

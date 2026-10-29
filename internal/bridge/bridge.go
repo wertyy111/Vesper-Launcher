@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -82,15 +84,12 @@ func (b *BridgeService) buildVersionCatalog(manifest *minecraft.VersionManifestV
 		for _, e := range entries {
 			if e.IsDir() {
 				jsonPath := filepath.Join(versionsDir, e.Name(), e.Name()+".json")
-				if _, errJ := os.Stat(jsonPath); err == nil || errJ == nil {
+				if _, errJ := os.Stat(jsonPath); errJ == nil {
 					installedMap[strings.ToLower(e.Name())] = true
 				}
 			}
 		}
 	}
-
-	// Always mark bundled as installed
-	installedMap["forgeoptifine 1.16.5"] = true
 
 	var catalog []models.VersionOption
 	seen := make(map[string]bool)
@@ -101,21 +100,40 @@ func (b *BridgeService) buildVersionCatalog(manifest *minecraft.VersionManifestV
 			return
 		}
 		seen[lower] = true
+
+		isInstalled := false
 		if installedMap[lower] {
-			opt.IsInstalled = true
+			isInstalled = true
+		} else if strings.HasPrefix(lower, "forge-") {
+			mcVer := strings.TrimPrefix(lower, "forge-")
+			for k := range installedMap {
+				if strings.Contains(k, "forge") && strings.Contains(k, mcVer) {
+					isInstalled = true
+					break
+				}
+			}
+		} else if strings.HasPrefix(lower, "fabric-") {
+			mcVer := strings.TrimPrefix(lower, "fabric-")
+			for k := range installedMap {
+				if (strings.Contains(k, "fabric") || strings.HasPrefix(k, "fabric-loader")) && strings.Contains(k, mcVer) {
+					isInstalled = true
+					break
+				}
+			}
+		} else if strings.HasPrefix(lower, "neoforge-") {
+			mcVer := strings.TrimPrefix(lower, "neoforge-")
+			for k := range installedMap {
+				if strings.Contains(k, "neoforge") && strings.Contains(k, mcVer) {
+					isInstalled = true
+					break
+				}
+			}
 		}
+		opt.IsInstalled = isInstalled
 		catalog = append(catalog, opt)
 	}
 
-	// 1. Add bundled ForgeOptiFine 1.16.5
-	addOption(models.VersionOption{
-		Key:         "ForgeOptiFine 1.16.5",
-		DisplayName: "1.16.5 - Forge + OptiFine",
-		Category:    "forge",
-		IsInstalled: true,
-	})
-
-	// 2. Mod loaders (Fabric, Forge, NeoForge, OptiFine) for popular releases
+	// 1. Mod loaders (Fabric, Forge, NeoForge, OptiFine) for popular releases
 	type loaderSpec struct {
 		prefix   string
 		name     string
@@ -310,7 +328,13 @@ func (b *BridgeService) searchMods(query, category, provider string) {
 			b.EmitSnapshot()
 		}()
 
-		items, err := b.modsClient.Search(query, category, b.state.SelectedVersion, "", 30)
+		if strings.EqualFold(provider, "curseforge") {
+			items := mods.SearchCurseForge(query, category)
+			b.state.SetMods(items, query, category, provider, false)
+			return
+		}
+
+		items, err := b.modsClient.Search(query, category, b.state.SelectedVersion, "", 40)
 		if err == nil && len(items) > 0 {
 			b.state.SetMods(items, query, category, provider, false)
 		}
@@ -358,7 +382,17 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 	case "main.selectversionkey":
 		if key, ok := payload["key"].(string); ok && key != "" {
 			b.state.SetSelectedVersion(key)
+			b.searchMods(b.state.SearchQuery, b.state.SelectedCategory, b.state.ModProvider)
 			b.EmitSnapshot()
+		}
+
+	case "main.deleteversion":
+		if key, ok := payload["key"].(string); ok && key != "" {
+			go func() {
+				b.deleteMinecraftVersion(key)
+				b.refreshVersionCatalog()
+				b.EmitSnapshot()
+			}()
 		}
 
 	case "main.openprofilefolder":
@@ -623,20 +657,114 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 	case "friends.remove":
 		b.EmitSnapshot()
 
+	case "mods.installversion":
+		projectId, _ := payload["projectId"].(string)
+		urlStr, _ := payload["url"].(string)
+		filename, _ := payload["filename"].(string)
+		contentKind, _ := payload["contentKind"].(string)
+
+		if urlStr != "" && filename != "" {
+			go func() {
+				b.state.StatusText = fmt.Sprintf("Скачивание %s...", filename)
+				b.EmitSnapshot()
+
+				err := b.downloadModFile(urlStr, filename, contentKind)
+				if err != nil {
+					b.state.StatusText = fmt.Sprintf("Ошибка скачивания %s: %v", filename, err)
+				} else {
+					if projectId != "" {
+						b.state.SetProjectInstalled(projectId, filename)
+					}
+					b.state.StatusText = fmt.Sprintf("%s успешно скачан", filename)
+				}
+				b.EmitSnapshot()
+			}()
+		}
+
 	case "mods.toggleitem":
 		if pid, ok := payload["projectId"].(string); ok && pid != "" {
-			for i, it := range b.state.ModItems {
-				if it.ProjectId == pid {
-					b.state.ModItems[i].IsInstalled = !it.IsInstalled
-					if b.state.ModItems[i].IsInstalled {
-						b.state.ModItems[i].ActionText = "Удалить"
-					} else {
-						b.state.ModItems[i].ActionText = "Установить"
-					}
-					break
+			go func() {
+				installedFile := b.state.GetInstalledProjectFile(pid)
+				if installedFile != "" || b.state.IsProjectInstalled(pid) {
+					b.state.StatusText = fmt.Sprintf("Удаление %s...", pid)
+					b.EmitSnapshot()
+
+					b.deleteModFile(pid, installedFile)
+					b.state.RemoveProjectInstalled(pid)
+					b.state.StatusText = fmt.Sprintf("%s удалён", pid)
+					b.EmitSnapshot()
+					return
 				}
-			}
-			b.EmitSnapshot()
+
+				// Not installed: resolve best version and download
+				b.state.StatusText = fmt.Sprintf("Поиск версии для %s...", pid)
+				b.EmitSnapshot()
+
+				var fileUrl, fileName, contentKind string
+				if strings.HasPrefix(pid, "cf-") {
+					for _, it := range mods.CurseForgePreviewCatalog {
+						if it.ProjectId == pid {
+							contentKind = it.ContentKind
+							switch pid {
+							case "cf-jei":
+								fileName = "jei-1.20.1-forge-15.2.0.27.jar"
+								fileUrl = "https://edge.forgecdn.net/files/4712/100/jei-1.20.1-forge-15.2.0.27.jar"
+							case "cf-journeymap":
+								fileName = "journeymap-1.20.1-5.9.12-forge.jar"
+								fileUrl = "https://edge.forgecdn.net/files/4652/389/journeymap-1.20.1-5.9.12-forge.jar"
+							case "cf-bop":
+								fileName = "BiomesOPlenty-1.20.1-18.0.0.598.jar"
+								fileUrl = "https://edge.forgecdn.net/files/4688/542/BiomesOPlenty-1.20.1-18.0.0.598.jar"
+							case "cf-tweaks":
+								fileName = "MouseTweaks-2.25-mc1.20.1.jar"
+								fileUrl = "https://edge.forgecdn.net/files/4574/819/MouseTweaks-2.25-mc1.20.1.jar"
+							case "cf-faithful":
+								fileName = "Faithful-32x-1.20.1.zip"
+								fileUrl = "https://edge.forgecdn.net/files/4580/112/Faithful-32x-1.20.1.zip"
+							case "cf-bsl":
+								fileName = "BSL_v8.2.09.zip"
+								fileUrl = "https://edge.forgecdn.net/files/4620/711/BSL_v8.2.09.zip"
+							case "cf-complimentary":
+								fileName = "ComplementaryReimagined_r5.0.1.zip"
+								fileUrl = "https://edge.forgecdn.net/files/4650/980/ComplementaryReimagined_r5.0.1.zip"
+							case "cf-rlcraft":
+								fileName = "RLCraft-1.12.2-v2.9.3.zip"
+								fileUrl = "https://edge.forgecdn.net/files/4610/500/RLCraft-1.12.2-v2.9.3.zip"
+							}
+							break
+						}
+					}
+				} else {
+					fName, fUrl, err := b.modsClient.GetProjectBestVersion(pid, b.state.SelectedVersion, "")
+					if err == nil && fUrl != "" {
+						fileName = fName
+						fileUrl = fUrl
+					}
+					for _, it := range b.state.ModItems {
+						if it.ProjectId == pid {
+							contentKind = it.ContentKind
+							break
+						}
+					}
+				}
+
+				if fileUrl == "" || fileName == "" {
+					b.state.StatusText = fmt.Sprintf("Не удалось найти файл для установки %s", pid)
+					b.EmitSnapshot()
+					return
+				}
+
+				b.state.StatusText = fmt.Sprintf("Скачивание %s...", fileName)
+				b.EmitSnapshot()
+
+				if err := b.downloadModFile(fileUrl, fileName, contentKind); err != nil {
+					b.state.StatusText = fmt.Sprintf("Ошибка скачивания: %v", err)
+				} else {
+					b.state.SetProjectInstalled(pid, fileName)
+					b.state.StatusText = fmt.Sprintf("%s успешно установлен", fileName)
+				}
+				b.EmitSnapshot()
+			}()
 		}
 
 	case "mods.togglefavorite":
@@ -715,7 +843,12 @@ func (b *BridgeService) HandleCommand(command string, payload map[string]any) er
 
 func (b *BridgeService) handleLaunch() {
 	b.state.SetBusy(true)
-	b.state.SetStatus("Подготовка к запуску...", "", 10, true)
+	isInstalled := b.state.IsVersionInstalled(b.state.SelectedVersion)
+	if isInstalled {
+		b.state.SetStatus("Подготовка к запуску...", "", 10, true)
+	} else {
+		b.state.SetStatus("Подготовка к установке...", "", 10, true)
+	}
 	b.EmitSnapshot()
 
 	go func() {
@@ -724,13 +857,18 @@ func (b *BridgeService) handleLaunch() {
 			nick = "Player"
 		}
 		opts := minecraft.LaunchOptions{
-			VersionID:  b.state.SelectedVersion,
-			Nickname:   nick,
-			MemoryMb:   b.state.JavaMemoryMb,
-			CustomJava: b.state.JavaPath,
-			CustomJvm:  b.state.JvmArgs,
+			VersionID:       b.state.SelectedVersion,
+			Nickname:        nick,
+			MemoryMb:        b.state.JavaMemoryMb,
+			JavaRuntimeMode: b.state.JavaRuntimeMode,
+			CustomJava:      b.state.JavaPath,
+			CustomJvm:       b.state.JvmArgs,
 			OnProgress: func(percent float64, message string) {
-				b.state.SetStatus("Загрузка...", message, percent, false)
+				if isInstalled {
+					b.state.SetStatus("Загрузка...", message, percent, false)
+				} else {
+					b.state.SetStatus("Установка...", message, percent, false)
+				}
 				b.EmitSnapshot()
 			},
 			OnGameStart: func() {
@@ -783,4 +921,142 @@ func (b *BridgeService) ExecuteRawCommand(messageJson string) {
 	if err := json.Unmarshal([]byte(messageJson), &envelope); err == nil {
 		_ = b.HandleCommand(envelope.Command, envelope.Payload)
 	}
+}
+
+func (b *BridgeService) getTargetDirectoryForContent(contentKind string) string {
+	mcDir := platform.GetMinecraftDir()
+	switch strings.ToLower(contentKind) {
+	case "shader", "shaders", "шейдеры":
+		return filepath.Join(mcDir, "shaderpacks")
+	case "resourcepack", "resourcepacks", "ресурспаки", "ресурс паки":
+		return filepath.Join(mcDir, "resourcepacks")
+	case "modpack", "modpacks", "сборки":
+		return filepath.Join(mcDir, "modpacks")
+	default:
+		return filepath.Join(mcDir, "mods")
+	}
+}
+
+func (b *BridgeService) downloadModFile(fileUrl, fileName, contentKind string) error {
+	destDir := b.getTargetDirectoryForContent(contentKind)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return err
+	}
+
+	cleanFileName := filepath.Base(fileName)
+	destPath := filepath.Join(destDir, cleanFileName)
+
+	req, err := http.NewRequest("GET", fileUrl, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "VesperLauncher/1.0 (contact@vesperlauncher.org)")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP error %s", resp.Status)
+	}
+
+	out, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
+func (b *BridgeService) deleteModFile(projectId, fileName string) {
+	mcDir := platform.GetMinecraftDir()
+	dirs := []string{
+		filepath.Join(mcDir, "mods"),
+		filepath.Join(mcDir, "resourcepacks"),
+		filepath.Join(mcDir, "shaderpacks"),
+		filepath.Join(mcDir, "modpacks"),
+	}
+
+	cleanTarget := filepath.Base(fileName)
+	for _, d := range dirs {
+		if cleanTarget != "" && cleanTarget != "." {
+			targetPath := filepath.Join(d, cleanTarget)
+			if _, err := os.Stat(targetPath); err == nil {
+				_ = os.Remove(targetPath)
+				return
+			}
+		}
+
+		if projectId != "" {
+			entries, err := os.ReadDir(d)
+			if err == nil {
+				cleanPid := strings.TrimPrefix(strings.ToLower(projectId), "cf-")
+				for _, e := range entries {
+					if !e.IsDir() && strings.Contains(strings.ToLower(e.Name()), cleanPid) {
+						_ = os.Remove(filepath.Join(d, e.Name()))
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
+func (b *BridgeService) deleteMinecraftVersion(key string) {
+	mcDir := platform.GetMinecraftDir()
+	versionsDir := filepath.Join(mcDir, "versions")
+
+	lowerKey := strings.ToLower(strings.TrimSpace(key))
+	if lowerKey == "" {
+		return
+	}
+
+	// 1. Direct folder match
+	exactPath := filepath.Join(versionsDir, key)
+	if _, err := os.Stat(exactPath); err == nil {
+		_ = os.RemoveAll(exactPath)
+	}
+
+	// 2. Scan for case-insensitive matches and modloader naming variations
+	entries, err := os.ReadDir(versionsDir)
+	if err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			nameLower := strings.ToLower(e.Name())
+			if nameLower == lowerKey {
+				_ = os.RemoveAll(filepath.Join(versionsDir, e.Name()))
+				continue
+			}
+
+			if strings.HasPrefix(lowerKey, "forge-") {
+				mcVer := strings.TrimPrefix(lowerKey, "forge-")
+				if strings.Contains(nameLower, "forge") && strings.Contains(nameLower, mcVer) {
+					_ = os.RemoveAll(filepath.Join(versionsDir, e.Name()))
+				}
+			} else if strings.HasPrefix(lowerKey, "fabric-") {
+				mcVer := strings.TrimPrefix(lowerKey, "fabric-")
+				if (strings.Contains(nameLower, "fabric") || strings.HasPrefix(nameLower, "fabric-loader")) && strings.Contains(nameLower, mcVer) {
+					_ = os.RemoveAll(filepath.Join(versionsDir, e.Name()))
+				}
+			} else if strings.HasPrefix(lowerKey, "neoforge-") {
+				mcVer := strings.TrimPrefix(lowerKey, "neoforge-")
+				if strings.Contains(nameLower, "neoforge") && strings.Contains(nameLower, mcVer) {
+					_ = os.RemoveAll(filepath.Join(versionsDir, e.Name()))
+				}
+			} else if strings.HasPrefix(lowerKey, "optifine-") {
+				mcVer := strings.TrimPrefix(lowerKey, "optifine-")
+				if strings.Contains(nameLower, "optifine") && strings.Contains(nameLower, mcVer) {
+					_ = os.RemoveAll(filepath.Join(versionsDir, e.Name()))
+				}
+			}
+		}
+	}
+
+	b.state.StatusText = fmt.Sprintf("Версия %s удалена", key)
 }

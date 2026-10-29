@@ -41,6 +41,46 @@ func TestOnlineFixJvmArguments(t *testing.T) {
 	}
 }
 
+func Test1165TLauncherMultiplayerFix(t *testing.T) {
+	ctx := LaunchContext{
+		MinecraftDir: "/test/.minecraft",
+		VersionID:    "1.16.5",
+		NativesDir:   "/test/natives",
+		Classpath:    "/test/cp.jar",
+		Username:     "Steve",
+		UUID:         "11111111222233334444555555555555",
+		AccessToken:  "11111111222233334444555555555555",
+		UserType:     "mojang",
+		MemoryMb:     2048,
+	}
+
+	args := BuildJvmArguments(ctx)
+	joined := strings.Join(args, " ")
+
+	expectedFlags := []string{
+		"-Dcom.mojang.minecraft.multiplayer=true",
+		"-Dcom.mojang.minecraft.onlineChat=true",
+		"-Dminecraft.api.auth.host=https://nope.invalid",
+		"-Dminecraft.api.account.host=https://nope.invalid",
+		"-Dminecraft.api.session.host=https://nope.invalid",
+		"-Dminecraft.api.services.host=https://nope.invalid",
+	}
+
+	for _, flag := range expectedFlags {
+		if !strings.Contains(joined, flag) {
+			t.Errorf("Expected 1.16.5 online fix flag %q not found in args: %s", flag, joined)
+		}
+	}
+
+	replacements := getReplacements(ctx)
+	if replacements["${clientid}"] != "offline-client" {
+		t.Errorf("Expected clientid 'offline-client', got %s", replacements["${clientid}"])
+	}
+	if replacements["${auth_xuid}"] != "0" {
+		t.Errorf("Expected auth_xuid '0', got %s", replacements["${auth_xuid}"])
+	}
+}
+
 func TestOfflineProfileToken(t *testing.T) {
 	prof := auth.CreateOfflineProfile("Player123")
 	if prof.AccessToken == "00000000-0000-0000-0000-000000000000" {

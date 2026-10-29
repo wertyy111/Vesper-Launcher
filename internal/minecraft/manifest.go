@@ -105,6 +105,55 @@ func MavenCoordinatesToPath(mavenName string) (string, error) {
 	return filepath.Join(filepath.FromSlash(groupPath), artifact, version, fileName), nil
 }
 
+// GetLibraryIdentity returns the unique groupId:artifactId key for deduplication and overriding.
+func GetLibraryIdentity(name string) string {
+	ext := "jar"
+	norm := strings.TrimSpace(name)
+	if atIdx := strings.Index(norm, "@"); atIdx != -1 {
+		ext = norm[atIdx+1:]
+		norm = norm[:atIdx]
+	}
+	parts := strings.Split(norm, ":")
+	if len(parts) < 3 {
+		return name
+	}
+	groupId := parts[0]
+	artifactId := parts[1]
+	classifier := ""
+	if len(parts) >= 4 {
+		classifier = parts[3]
+	}
+	if classifier != "" {
+		return fmt.Sprintf("%s:%s:%s@%s", groupId, artifactId, classifier, ext)
+	}
+	return fmt.Sprintf("%s:%s@%s", groupId, artifactId, ext)
+}
+
+// MergeLibraries merges parent and child libraries, letting the child override matching (groupId:artifactId) libraries.
+func MergeLibraries(parentLibs, childLibs []LibraryEntry) []LibraryEntry {
+	indexByKey := make(map[string]int)
+	var merged []LibraryEntry
+
+	addOrOverride := func(lib LibraryEntry) {
+		key := GetLibraryIdentity(lib.Name)
+		if idx, exists := indexByKey[key]; exists {
+			merged[idx] = lib
+		} else {
+			indexByKey[key] = len(merged)
+			merged = append(merged, lib)
+		}
+	}
+
+	for _, l := range parentLibs {
+		addOrOverride(l)
+	}
+	for _, l := range childLibs {
+		addOrOverride(l)
+	}
+
+	return merged
+}
+
 type LibraryDownloads struct {
 	Artifact    *DownloadArtifact           `json:"artifact"`
 	Classifiers map[string]DownloadArtifact `json:"classifiers"`
@@ -125,39 +174,48 @@ type JavaVersionInfo struct {
 	MajorVersion int    `json:"majorVersion"`
 }
 
-// FetchMojangManifest retrieves or loads the cached Mojang version manifest.
+// FetchMojangManifest retrieves or loads the cached Mojang version manifest, with automatic BMCLAPI fallback.
 func FetchMojangManifest() (*VersionManifestV2, error) {
 	cachePath := filepath.Join(platform.GetMinecraftDir(), "version_manifest_v2.json")
 
-	// Try network first
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(MojangManifestURL)
-	if err == nil && resp.StatusCode == 200 {
-		defer resp.Body.Close()
-		bytes, err := io.ReadAll(resp.Body)
-		if err == nil {
-			var manifest VersionManifestV2
-			if err := json.Unmarshal(bytes, &manifest); err == nil {
-				_ = os.WriteFile(cachePath, bytes, 0644)
-				return &manifest, nil
+	urls := []string{
+		"https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
+		"https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json",
+		"https://launchermeta.mojang.com/mc/game/version_manifest_v2.json",
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	for _, u := range urls {
+		resp, err := client.Get(u)
+		if err == nil && resp.StatusCode == 200 {
+			data, errR := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if errR == nil {
+				var manifest VersionManifestV2
+				if err := json.Unmarshal(data, &manifest); err == nil && len(manifest.Versions) > 0 {
+					_ = os.WriteFile(cachePath, data, 0644)
+					return &manifest, nil
+				}
 			}
+		} else if resp != nil {
+			resp.Body.Close()
 		}
 	}
 
 	// Fallback to cache
-	bytes, err := os.ReadFile(cachePath)
+	data, err := os.ReadFile(cachePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch manifest and no cache available")
 	}
 
 	var manifest VersionManifestV2
-	if err := json.Unmarshal(bytes, &manifest); err != nil {
+	if err := json.Unmarshal(data, &manifest); err != nil {
 		return nil, err
 	}
 	return &manifest, nil
 }
 
-// LoadVersionPackage loads a specific version's package JSON from disk or Mojang.
+// LoadVersionPackage loads a specific version's package JSON from disk or Mojang/mirrors.
 func LoadVersionPackage(versionId, versionUrl string) (*VersionPackage, error) {
 	mcDir := platform.GetMinecraftDir()
 	versionJsonPath := filepath.Join(mcDir, "versions", versionId, versionId+".json")
@@ -173,23 +231,38 @@ func LoadVersionPackage(versionId, versionUrl string) (*VersionPackage, error) {
 		return nil, fmt.Errorf("version JSON not found locally and no URL provided")
 	}
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(versionUrl)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+	candidates := GetDownloadFallbackURLs(versionUrl)
+	client := &http.Client{Timeout: 20 * time.Second}
 
-	bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	var data []byte
+	var fetchErr error
+	for _, u := range candidates {
+		resp, err := client.Get(u)
+		if err == nil && resp.StatusCode == 200 {
+			b, errR := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if errR == nil && len(b) > 0 {
+				data = b
+				fetchErr = nil
+				break
+			}
+		} else {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			fetchErr = err
+		}
+	}
+
+	if len(data) == 0 {
+		return nil, fmt.Errorf("failed to download version package from %s: %v", versionUrl, fetchErr)
 	}
 
 	_ = os.MkdirAll(filepath.Dir(versionJsonPath), 0755)
-	_ = os.WriteFile(versionJsonPath, bytes, 0644)
+	_ = os.WriteFile(versionJsonPath, data, 0644)
 
 	var pkg VersionPackage
-	if err := json.Unmarshal(bytes, &pkg); err != nil {
+	if err := json.Unmarshal(data, &pkg); err != nil {
 		return nil, err
 	}
 	return &pkg, nil

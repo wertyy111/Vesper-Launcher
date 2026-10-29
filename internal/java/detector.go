@@ -2,6 +2,7 @@ package java
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,7 +32,40 @@ func DetectRuntimes() []JavaInfo {
 		}
 	}
 
-	// 2. OS-specific standard directories
+	// 2. Check JAVA_HOME & JDK_HOME
+	for _, envKey := range []string{"JAVA_HOME", "JDK_HOME"} {
+		if envVal := os.Getenv(envKey); envVal != "" {
+			binJava := filepath.Join(envVal, "bin", "java")
+			if runtime.GOOS == "windows" {
+				binJava = filepath.Join(envVal, "bin", "java.exe")
+			}
+			if _, err := os.Stat(binJava); err == nil {
+				candidates = append(candidates, binJava)
+			}
+		}
+	}
+
+	// 3. User home directories (~/.jdks, ~/.sdkman/candidates/java)
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		scanJavaDir(filepath.Join(homeDir, ".jdks"), &candidates)
+		scanJavaDir(filepath.Join(homeDir, ".sdkman", "candidates", "java"), &candidates)
+		scanJavaDir(filepath.Join(homeDir, ".config", "VesperLauncher", "runtimes"), &candidates)
+
+		// Bundled runtimes of other launchers (Mojang official, TLauncher, etc.)
+		for _, pattern := range []string{
+			filepath.Join(homeDir, ".tlauncher", "mojang_jre", "*", "*", "*", "bin", "java"),
+			filepath.Join(homeDir, ".minecraft", "runtime", "*", "*", "*", "bin", "java"),
+			filepath.Join(homeDir, ".minecraft", "runtime", "*", "bin", "java"),
+			filepath.Join(homeDir, ".minecraft", "java-runtimes", "*", "bin", "java"),
+			filepath.Join(homeDir, ".local", "share", "PrismLauncher", "java", "*", "bin", "java"),
+		} {
+			if matches, err := filepath.Glob(pattern); err == nil {
+				candidates = append(candidates, matches...)
+			}
+		}
+	}
+
+	// 4. OS-specific standard directories
 	switch runtime.GOOS {
 	case "windows":
 		programFiles := os.Getenv("ProgramFiles")
@@ -48,6 +82,7 @@ func DetectRuntimes() []JavaInfo {
 		scanJavaDir("/usr/lib/jvm", &candidates)
 		scanJavaDir("/usr/java", &candidates)
 		scanJavaDir("/opt/java", &candidates)
+		scanJavaDir("/opt/jdk", &candidates)
 	}
 
 	// Remove duplicates and inspect
@@ -143,35 +178,71 @@ func parseMajorVersion(v string) int {
 	return 8
 }
 
-// SelectBestJava chooses the appropriate Java version for the given Minecraft release.
-func SelectBestJava(mcVersion string, runtimes []JavaInfo) string {
-	requiredMajor := 21
-	if strings.HasPrefix(mcVersion, "1.16") || strings.HasPrefix(mcVersion, "1.12") || strings.HasPrefix(mcVersion, "1.8") {
-		requiredMajor = 8
-	} else if strings.HasPrefix(mcVersion, "1.17") || strings.HasPrefix(mcVersion, "1.18") || strings.HasPrefix(mcVersion, "1.19") || strings.HasPrefix(mcVersion, "1.20.0") || strings.HasPrefix(mcVersion, "1.20.1") || strings.HasPrefix(mcVersion, "1.20.2") || strings.HasPrefix(mcVersion, "1.20.3") || strings.HasPrefix(mcVersion, "1.20.4") {
-		requiredMajor = 17
+var baseVersionRegex = regexp.MustCompile(`\b(1\.\d+(\.\d+)?)\b`)
+
+// ExtractMinecraftBaseVersion extracts the vanilla release version from names like "forge-1.19.2", "fabric-1.20.1", "1.16.5"
+func ExtractMinecraftBaseVersion(v string) string {
+	matches := baseVersionRegex.FindStringSubmatch(v)
+	if len(matches) > 1 {
+		return matches[1]
 	}
+	return v
+}
+
+// GetRequiredJavaMajor returns the target Java major version for a given Minecraft release.
+func GetRequiredJavaMajor(mcVersion string) int {
+	base := ExtractMinecraftBaseVersion(mcVersion)
+	if strings.HasPrefix(base, "1.16") ||
+		strings.HasPrefix(base, "1.15") ||
+		strings.HasPrefix(base, "1.14") ||
+		strings.HasPrefix(base, "1.13") ||
+		strings.HasPrefix(base, "1.12") ||
+		strings.HasPrefix(base, "1.11") ||
+		strings.HasPrefix(base, "1.10") ||
+		strings.HasPrefix(base, "1.9") ||
+		strings.HasPrefix(base, "1.8") ||
+		strings.HasPrefix(base, "1.7") {
+		return 8
+	}
+	if strings.HasPrefix(base, "1.17") {
+		return 16
+	}
+	if strings.HasPrefix(base, "1.18") ||
+		strings.HasPrefix(base, "1.19") ||
+		base == "1.20" ||
+		base == "1.20.1" ||
+		base == "1.20.2" ||
+		base == "1.20.3" ||
+		base == "1.20.4" {
+		return 17
+	}
+	return 21
+}
+
+// SelectBestJava chooses the appropriate Java version for the given Minecraft release.
+func SelectBestJava(mcVersion string, runtimes []JavaInfo) (string, int, error) {
+	requiredMajor := GetRequiredJavaMajor(mcVersion)
 
 	// 1. Exact match
 	for _, r := range runtimes {
 		if r.MajorVersion == requiredMajor {
-			return r.Path
+			return r.Path, requiredMajor, nil
 		}
 	}
 
-	// 2. Compatible higher version (except Java 8 which needs 8)
+	// 2. Compatible higher version (for Java 17+, except Java 8 which strictly needs 8)
 	if requiredMajor > 8 {
 		for _, r := range runtimes {
-			if r.MajorVersion >= requiredMajor {
-				return r.Path
+			if r.MajorVersion >= requiredMajor && r.MajorVersion <= 25 {
+				return r.Path, requiredMajor, nil
 			}
 		}
 	}
 
-	// 3. Fallback to first available
+	// 3. Fallback to first available with an error if incompatible
 	if len(runtimes) > 0 {
-		return runtimes[0].Path
+		return runtimes[0].Path, requiredMajor, fmt.Errorf("для версии %s требуется Java %d, но найдена только Java %d (%s)", mcVersion, requiredMajor, runtimes[0].MajorVersion, runtimes[0].Path)
 	}
 
-	return "java"
+	return "java", requiredMajor, fmt.Errorf("для версии %s требуется Java %d, но Java не обнаружена на компьютере", mcVersion, requiredMajor)
 }

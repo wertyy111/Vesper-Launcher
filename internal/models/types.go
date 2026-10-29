@@ -170,12 +170,13 @@ type ModItem struct {
 }
 
 type ModsSnapshot struct {
-	Provider         string    `json:"provider"`
-	Items            []ModItem `json:"items"`
-	SearchQuery      string    `json:"searchQuery"`
-	SelectedCategory string    `json:"selectedCategory"`
-	IsCatalogLoading bool      `json:"isCatalogLoading"`
-	CatalogSummary   string    `json:"catalogSummary"`
+	Provider           string    `json:"provider"`
+	Items              []ModItem `json:"items"`
+	SearchQuery        string    `json:"searchQuery"`
+	SelectedCategory   string    `json:"selectedCategory"`
+	IsCatalogLoading   bool      `json:"isCatalogLoading"`
+	CatalogSummary     string    `json:"catalogSummary"`
+	InstalledFileNames []string  `json:"installedFileNames"`
 }
 
 type FriendEntry struct {

@@ -14,14 +14,15 @@ import (
 )
 
 type LaunchOptions struct {
-	VersionID    string
-	Nickname     string
-	MemoryMb     int
-	CustomJava   string
-	CustomJvm    string
-	OnProgress   func(percent float64, message string)
-	OnGameStart  func()
-	OnGameFinish func(exitCode int)
+	VersionID       string
+	Nickname        string
+	MemoryMb        int
+	JavaRuntimeMode string
+	CustomJava      string
+	CustomJvm       string
+	OnProgress      func(percent float64, message string)
+	OnGameStart     func()
+	OnGameFinish    func(exitCode int)
 }
 
 // LaunchGame orchestrates the full sequence of verifying files, building arguments, and spawning the Minecraft process.
@@ -40,11 +41,41 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 		parentPkg, _ = LoadVersionPackage(pkg.InheritsFrom, "")
 	}
 
-	// 2. Locate Java runtime
-	javaPath := opts.CustomJava
-	if javaPath == "" {
-		runtimes := java.DetectRuntimes()
-		javaPath = java.SelectBestJava(opts.VersionID, runtimes)
+	// 2. Locate Java runtime based on JavaRuntimeMode (auto, system, custom)
+	var javaPath string
+	switch opts.JavaRuntimeMode {
+	case "custom":
+		javaPath = strings.TrimSpace(opts.CustomJava)
+		if javaPath == "" {
+			return nil, fmt.Errorf("в настройках выбран режим 'Свой', но путь к Java не указан. Укажите путь к исполняемому файлу java")
+		}
+		if _, err := os.Stat(javaPath); err != nil {
+			return nil, fmt.Errorf("указанный файл Java не найден: %s", javaPath)
+		}
+	case "system":
+		sysJava, err := exec.LookPath("java")
+		if err != nil {
+			return nil, fmt.Errorf("системная Java не найдена в PATH (переменных окружения)")
+		}
+		javaPath = sysJava
+	case "auto", "":
+		if opts.CustomJava != "" && opts.JavaRuntimeMode == "" {
+			javaPath = opts.CustomJava
+		} else {
+			runtimes := java.DetectRuntimes()
+			bestPath, reqMajor, err := java.SelectBestJava(opts.VersionID, runtimes)
+			if err != nil {
+				if opts.OnProgress != nil {
+					opts.OnProgress(10, fmt.Sprintf("Подготовка Java %d для версии %s...", reqMajor, opts.VersionID))
+				}
+				dlJava, dlErr := java.EnsureJavaRuntime(reqMajor, opts.OnProgress)
+				if dlErr != nil {
+					return nil, fmt.Errorf("для версии %s требуется Java %d, но не удалось автоматически установить её: %w", opts.VersionID, reqMajor, dlErr)
+				}
+				bestPath = dlJava
+			}
+			javaPath = bestPath
+		}
 	}
 
 	if opts.OnProgress != nil {
@@ -81,24 +112,11 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 		}
 	}
 
-	collectLibraries(pkg.Libraries)
 	if parentPkg != nil {
-		collectLibraries(parentPkg.Libraries)
+		collectLibraries(MergeLibraries(parentPkg.Libraries, pkg.Libraries))
+	} else {
+		collectLibraries(pkg.Libraries)
 	}
-
-	// Also append any bundled libraries if on disk and not yet included
-	bundledLibsDir := filepath.Join("bundled", "BundledLibraries")
-	_ = filepath.Walk(bundledLibsDir, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() && strings.HasSuffix(info.Name(), ".jar") {
-			rel, _ := filepath.Rel(bundledLibsDir, path)
-			installedLibPath := filepath.Join(librariesDir, rel)
-			if _, statErr := os.Stat(installedLibPath); statErr == nil && !seenLibs[installedLibPath] {
-				seenLibs[installedLibPath] = true
-				libPaths = append(libPaths, installedLibPath)
-			}
-		}
-		return nil
-	})
 
 	// 4. Client JAR
 	clientJar := filepath.Join(versionsDir, opts.VersionID+".jar")
@@ -121,6 +139,7 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 
 	userUUID := profile.UUID
 	userToken := profile.AccessToken
+	userType := "mojang"
 	if isLegacyVersion(opts.VersionID) {
 		raw := strings.ReplaceAll(profile.UUID, "-", "")
 		userUUID = raw
@@ -162,16 +181,22 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 		jvmArgsList = append(jvmArgsList, pkg.Arguments.Jvm...)
 	}
 
+	parentID := ""
+	if parentPkg != nil {
+		parentID = parentPkg.ID
+	}
+
 	ctx := LaunchContext{
-		MinecraftDir: mcDir,
-		VersionID:    opts.VersionID,
-		NativesDir:   nativesDir,
+		MinecraftDir:    mcDir,
+		VersionID:       opts.VersionID,
+		ParentVersionID: parentID,
+		NativesDir:      nativesDir,
 		Classpath:    classpath,
 		MainClass:    mainClass,
 		Username:     profile.Username,
 		UUID:         userUUID,
 		AccessToken:  userToken,
-		UserType:     profile.UserType,
+		UserType:     userType,
 		VersionType:  "release",
 		AssetsDir:    assetsDir,
 		AssetIndex:   assetIndex,
@@ -190,7 +215,6 @@ func LaunchGame(opts LaunchOptions) (*exec.Cmd, error) {
 
 	var finalArgs []string
 	finalArgs = append(finalArgs, jvmArgs...)
-	finalArgs = append(finalArgs, "-cp", classpath)
 	finalArgs = append(finalArgs, ctx.MainClass)
 	finalArgs = append(finalArgs, gameArgs...)
 

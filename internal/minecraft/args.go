@@ -8,9 +8,10 @@ import (
 )
 
 type LaunchContext struct {
-	MinecraftDir string
-	VersionID    string
-	NativesDir   string
+	MinecraftDir    string
+	VersionID       string
+	ParentVersionID string
+	NativesDir      string
 	Classpath    string
 	MainClass    string
 	Username     string
@@ -79,9 +80,24 @@ func BuildJvmArguments(ctx LaunchContext) []string {
 	args = append(args, fmt.Sprintf("-Xmx%dM", mem))
 	args = append(args, "-Xms512M")
 
-	// Natives path
-	args = append(args, fmt.Sprintf("-Djava.library.path=%s", ctx.NativesDir))
-	args = append(args, fmt.Sprintf("-Dorg.lwjgl.librarypath=%s", ctx.NativesDir))
+	// Aikar's high-performance garbage collection flags (from C# JvmArgBuilder.cs)
+	args = append(args,
+		"-XX:+UseG1GC",
+		"-XX:+ParallelRefProcEnabled",
+		"-XX:MaxGCPauseMillis=50",
+		"-XX:+UnlockExperimentalVMOptions",
+		"-XX:G1NewSizePercent=20",
+		"-XX:G1ReservePercent=20",
+		"-XX:G1MixedGCCountTarget=4",
+		"-XX:G1HeapWastePercent=5",
+		"-XX:G1MixedGCLiveThresholdPercent=90",
+		"-XX:G1RSetUpdatingPauseTimePercent=5",
+		"-XX:SurvivorRatio=32",
+		"-XX:+PerfDisableSharedMem",
+		"-XX:MaxTenuringThreshold=1",
+	)
+
+	// Natives path is added below (only if metadata doesn't provide it)
 
 	// Encoding
 	args = append(args, "-Dfile.encoding=UTF-8")
@@ -105,21 +121,47 @@ func BuildJvmArguments(ctx LaunchContext) []string {
 
 	// Force multiplayer button and chat enabled in offline mode (from C# line 8917)
 	args = append(args, "-Dcom.mojang.minecraft.multiplayer=true")
+	args = append(args, "-Dcom.mojang.minecraft.onlineChat=true")
 	args = append(args, "-Dcom.mojang.minecraft.chat=true")
+
+	// TLauncher-style 1.16.5 / 1.16.x offline multiplayer fix:
+	// In Minecraft 1.16.4/1.16.5, Mojang added Microsoft account safety privilege checks.
+	// When launched without a Microsoft account, contacting api.minecraftservices.com returns 401 Unauthorized,
+	// which locks the "Multiplayer" button ("Сетевая игра отключена. Проверьте настройки учетной записи Microsoft").
+	// Setting api services hosts to nope.invalid forces Minecraft to catch UnknownHostException,
+	// causing it to fall back to enabling multiplayer in offline mode!
+	if strings.Contains(ctx.VersionID, "1.16") || strings.Contains(ctx.ParentVersionID, "1.16") {
+		args = append(args, "-Dminecraft.api.auth.host=https://nope.invalid")
+		args = append(args, "-Dminecraft.api.account.host=https://nope.invalid")
+		args = append(args, "-Dminecraft.api.session.host=https://nope.invalid")
+		args = append(args, "-Dminecraft.api.services.host=https://nope.invalid")
+	}
+
+	hasClasspath := false
+	hasNativePath := false
 
 	// Metadata JVM arguments if any (e.g., from Fabric/Forge JSON)
 	if len(ctx.JvmArgs) > 0 {
 		replacements := getReplacements(ctx)
-		parsedJvm := parseArgumentEntries(ctx.JvmArgs, replacements)
+		parsedJvm := parseArgumentEntries(ctx.JvmArgs, replacements, ctx.ParentVersionID)
 		for _, arg := range parsedJvm {
-			// Skip classpath and natives flags as they are managed explicitly
-			if strings.HasPrefix(arg, "-Djava.library.path=") ||
-				strings.HasPrefix(arg, "-Dorg.lwjgl.librarypath=") ||
-				arg == "-cp" || arg == "-classpath" {
-				continue
+			if arg == "-cp" || arg == "-classpath" {
+				hasClasspath = true
+			}
+			if strings.HasPrefix(arg, "-Djava.library.path=") {
+				hasNativePath = true
 			}
 			args = append(args, arg)
 		}
+	}
+
+	if !hasNativePath {
+		args = append(args, fmt.Sprintf("-Djava.library.path=%s", ctx.NativesDir))
+		args = append(args, fmt.Sprintf("-Dorg.lwjgl.librarypath=%s", ctx.NativesDir))
+	}
+
+	if !hasClasspath {
+		args = append(args, "-cp", ctx.Classpath)
 	}
 
 	// Custom user JVM args
@@ -148,21 +190,42 @@ func getReplacements(ctx LaunchContext) map[string]string {
 		"${user_type}":           ctx.UserType,
 		"${version_type}":        ctx.VersionType,
 		"${user_properties}":     "{}",
-		"${clientid}":            "",
-		"${auth_xuid}":           "",
+		"${clientid}":            "offline-client",
+		"${auth_xuid}":           "0",
 		"${classpath}":           ctx.Classpath,
 		"${natives_directory}":   ctx.NativesDir,
 		"${library_directory}":   filepath.Join(ctx.MinecraftDir, "libraries"),
 		"${classpath_separator}": cpSep,
+		"${resolution_width}":    "1280",
+		"${resolution_height}":   "720",
+		"${launcher_name}":       "VesperLauncher",
+		"${launcher_version}":    "1.0.0",
+		"${version_type_name}":   ctx.VersionType,
 	}
 }
 
-func parseArgumentEntries(entries []any, replacements map[string]string) []string {
+func appendParentJarToIgnoreList(arg, parentVersion string) string {
+	if !strings.HasPrefix(arg, "-DignoreList=") || parentVersion == "" {
+		return arg
+	}
+	target := parentVersion + ".jar"
+	tokens := strings.Split(arg, ",")
+	for _, t := range tokens {
+		if t == target {
+			return arg
+		}
+	}
+	return arg + "," + target
+}
+
+func parseArgumentEntries(entries []any, replacements map[string]string, parentVersion string) []string {
 	var result []string
 	for _, entry := range entries {
 		switch v := entry.(type) {
 		case string:
-			result = append(result, replaceTokens(v, replacements))
+			expanded := replaceTokens(v, replacements)
+			expanded = appendParentJarToIgnoreList(expanded, parentVersion)
+			result = append(result, expanded)
 		case map[string]any:
 			// check rules if any
 			if rulesAny, ok := v["rules"].([]any); ok {
@@ -173,11 +236,15 @@ func parseArgumentEntries(entries []any, replacements map[string]string) []strin
 			valAny := v["value"]
 			switch val := valAny.(type) {
 			case string:
-				result = append(result, replaceTokens(val, replacements))
+				expanded := replaceTokens(val, replacements)
+				expanded = appendParentJarToIgnoreList(expanded, parentVersion)
+				result = append(result, expanded)
 			case []any:
 				for _, part := range val {
 					if s, ok := part.(string); ok {
-						result = append(result, replaceTokens(s, replacements))
+						expanded := replaceTokens(s, replacements)
+						expanded = appendParentJarToIgnoreList(expanded, parentVersion)
+						result = append(result, expanded)
 					}
 				}
 			}
@@ -243,7 +310,7 @@ func BuildGameArguments(ctx LaunchContext, rawTemplate string) []string {
 	var result []string
 
 	if len(ctx.GameArgs) > 0 {
-		result = parseArgumentEntries(ctx.GameArgs, replacements)
+		result = parseArgumentEntries(ctx.GameArgs, replacements, ctx.ParentVersionID)
 	} else if rawTemplate != "" {
 		tokens := strings.Fields(rawTemplate)
 		for _, tok := range tokens {

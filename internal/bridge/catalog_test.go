@@ -39,7 +39,7 @@ func TestBuildVersionCatalogIncludesModLoaders(t *testing.T) {
 
 	// Verify specific popular mod versions
 	expectedKeys := []string{
-		"ForgeOptiFine 1.16.5",
+		"forge-1.16.5",
 		"fabric-1.20.1",
 		"forge-1.20.1",
 		"optifine-1.20.1",

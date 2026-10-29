@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	DefaultWindowWidth  = 1200
-	DefaultWindowHeight = 760
+	DefaultWindowWidth  = 1405
+	DefaultWindowHeight = 840
 	MinWindowWidth      = 900
 	MinWindowHeight     = 580
 	MaxWindowWidth      = 3840
@@ -60,10 +60,12 @@ type LauncherState struct {
 	Friends                 []models.FriendEntry
 	FriendRequests          []models.FriendRequest
 	Updates                 models.UpdatesSnapshot
+	InstalledProjects       map[string]string
 }
 
 func NewLauncherState() *LauncherState {
 	s := &LauncherState{
+		InstalledProjects:       make(map[string]string),
 		ActiveSection:           "none",
 		ActiveSettingsTab:       "launcher",
 		Nickname:                "",
@@ -85,15 +87,122 @@ func NewLauncherState() *LauncherState {
 			Version:     "1.0.65",
 		},
 		Versions: []models.VersionOption{
-			{Key: "1.21.4", DisplayName: "1.21.4 - ванильная", Category: "release", IsInstalled: true},
+			{Key: "1.21.4", DisplayName: "1.21.4 - ванильная", Category: "release", IsInstalled: false},
 			{Key: "1.20.4", DisplayName: "1.20.4 - ванильная", Category: "release", IsInstalled: false},
-			{Key: "1.16.5", DisplayName: "1.16.5 - ForgeOptiFine", Category: "forge", IsInstalled: true},
+			{Key: "1.16.5", DisplayName: "1.16.5 - ванильная", Category: "release", IsInstalled: false},
 			{Key: "1.12.2", DisplayName: "1.12.2 - ванильная", Category: "release", IsInstalled: false},
 		},
 	}
 	s.updateThemeByTime()
 	s.Load()
 	return s
+}
+
+func (s *LauncherState) isVersionInstalledLocked(key string) bool {
+	lower := strings.ToLower(strings.TrimSpace(key))
+	for _, v := range s.Versions {
+		if strings.ToLower(v.Key) == lower {
+			if v.IsInstalled {
+				return true
+			}
+		}
+	}
+
+	mcDir := platform.GetMinecraftDir()
+	versionsDir := filepath.Join(mcDir, "versions")
+
+	checkInstalled := func(dirName string) bool {
+		jsonPath := filepath.Join(versionsDir, dirName, dirName+".json")
+		if _, err := os.Stat(jsonPath); err != nil {
+			return false
+		}
+		jarPath := filepath.Join(versionsDir, dirName, dirName+".jar")
+		if _, err := os.Stat(jarPath); err == nil {
+			return true
+		}
+		// Check if it inherits from another version
+		if data, err := os.ReadFile(jsonPath); err == nil {
+			var meta struct {
+				InheritsFrom string `json:"inheritsFrom"`
+				Jar          string `json:"jar"`
+			}
+			if errU := json.Unmarshal(data, &meta); errU == nil {
+				parent := meta.Jar
+				if parent == "" {
+					parent = meta.InheritsFrom
+				}
+				if parent != "" {
+					parentJar := filepath.Join(versionsDir, parent, parent+".jar")
+					if _, errP := os.Stat(parentJar); errP == nil {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}
+
+	if checkInstalled(key) || checkInstalled(lower) {
+		return true
+	}
+
+	if entries, err := os.ReadDir(versionsDir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			name := strings.ToLower(e.Name())
+			if name == lower {
+				if checkInstalled(e.Name()) {
+					return true
+				}
+			}
+			if strings.HasPrefix(lower, "fabric-") {
+				mcVer := strings.TrimPrefix(lower, "fabric-")
+				if (strings.Contains(name, "fabric") || strings.HasPrefix(name, "fabric-loader")) && strings.Contains(name, mcVer) {
+					if checkInstalled(e.Name()) {
+						return true
+					}
+				}
+			}
+			if strings.HasPrefix(lower, "forge-") {
+				mcVer := strings.TrimPrefix(lower, "forge-")
+				if strings.Contains(name, "forge") && strings.Contains(name, mcVer) {
+					if checkInstalled(e.Name()) {
+						return true
+					}
+				}
+			}
+			if strings.HasPrefix(lower, "neoforge-") {
+				mcVer := strings.TrimPrefix(lower, "neoforge-")
+				if strings.Contains(name, "neoforge") && strings.Contains(name, mcVer) {
+					if checkInstalled(e.Name()) {
+						return true
+					}
+				}
+			}
+			if strings.HasPrefix(lower, "optifine-") || strings.HasPrefix(lower, "optifine ") {
+				mcVer := strings.TrimPrefix(lower, "optifine-")
+				mcVer = strings.TrimPrefix(mcVer, "optifine ")
+				if strings.Contains(mcVer, " ") {
+					mcVer = strings.Fields(mcVer)[0]
+				}
+				if strings.Contains(name, "optifine") && strings.Contains(name, mcVer) {
+					if checkInstalled(e.Name()) {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func (s *LauncherState) IsVersionInstalled(key string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.isVersionInstalledLocked(key)
 }
 
 func (s *LauncherState) updateThemeByTime() {
@@ -113,11 +222,19 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	isInstalled := s.isVersionInstalledLocked(s.SelectedVersion)
+
 	launchText := "Играть"
 	if s.IsBusy {
-		launchText = "Загрузка..."
+		if isInstalled {
+			launchText = "Запуск..."
+		} else {
+			launchText = "Установка..."
+		}
 	} else if s.IsGameRunning {
 		launchText = "Игра запущена"
+	} else if !isInstalled {
+		launchText = "Установить"
 	}
 
 	inlineLabel := s.SelectedVersion
@@ -214,6 +331,7 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 				ClickSoundEnabled:            true,
 				JavaRuntimeMode:              s.JavaRuntimeMode,
 				JavaRuntimeOptions: []map[string]string{
+					{"id": "auto", "label": "Автоматически"},
 					{"id": "system", "label": "Системная Java"},
 					{"id": "custom", "label": "Свой путь"},
 				},
@@ -227,7 +345,7 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 					{"id": "current", "label": "Текущая"},
 					{"id": "minecraft", "label": ".minecraft"},
 				},
-				JavaModeHint:           "Лаунчер использует системную или указанную Java для запуска Minecraft.",
+				JavaModeHint:           s.GetJavaModeHint(),
 				AutoMemoryHint:         "Память задана вручную.",
 				AutoMinimizeHint:       "Будет скрыт после запуска игры.",
 				RestoreHint:            "Лаунчер восстановится после завершения игры.",
@@ -258,12 +376,13 @@ func (s *LauncherState) GetSnapshot() *models.HostSnapshot {
 				},
 			},
 			Mods: models.ModsSnapshot{
-				Provider:         s.ModProvider,
-				Items:            s.ModItems,
-				SearchQuery:      s.SearchQuery,
-				SelectedCategory: s.SelectedCategory,
-				IsCatalogLoading: s.IsCatalogLoading,
-				CatalogSummary:   "Популярные модификации для Minecraft",
+				Provider:           s.ModProvider,
+				Items:              s.getDecoratedModItemsLocked(s.ScanInstalledFiles()),
+				SearchQuery:        s.SearchQuery,
+				SelectedCategory:   s.SelectedCategory,
+				IsCatalogLoading:   s.IsCatalogLoading,
+				CatalogSummary:     "Популярные модификации для Minecraft",
+				InstalledFileNames: s.ScanInstalledFiles(),
 			},
 			Friends: models.FriendsSnapshot{
 				ProfileAvatarUrl:         s.AvatarUrl,
@@ -343,18 +462,19 @@ func (s *LauncherState) SetBackground(bgUrl string) {
 }
 
 type serializedState struct {
-	Nickname                string `json:"nickname"`
-	SelectedVersion         string `json:"selectedVersion"`
-	JavaMemoryMb            int    `json:"javaMemoryMb"`
-	JavaPath                string `json:"javaPath"`
-	JvmArgs                 string `json:"jvmArgs"`
-	LanguageCode            string `json:"languageCode"`
-	CurrentBgUrl            string `json:"currentBgUrl"`
-	LoginFormPlacementId    string `json:"loginFormPlacementId"`
-	LauncherDirectoryViewId string `json:"launcherDirectoryViewId"`
-	JavaRuntimeMode         string `json:"javaRuntimeMode"`
-	WindowWidth             int    `json:"windowWidth"`
-	WindowHeight            int    `json:"windowHeight"`
+	Nickname                string            `json:"nickname"`
+	SelectedVersion         string            `json:"selectedVersion"`
+	JavaMemoryMb            int               `json:"javaMemoryMb"`
+	JavaPath                string            `json:"javaPath"`
+	JvmArgs                 string            `json:"jvmArgs"`
+	LanguageCode            string            `json:"languageCode"`
+	CurrentBgUrl            string            `json:"currentBgUrl"`
+	LoginFormPlacementId    string            `json:"loginFormPlacementId"`
+	LauncherDirectoryViewId string            `json:"launcherDirectoryViewId"`
+	JavaRuntimeMode         string            `json:"javaRuntimeMode"`
+	WindowWidth             int               `json:"windowWidth"`
+	WindowHeight            int               `json:"windowHeight"`
+	InstalledProjects       map[string]string `json:"installedProjects,omitempty"`
 }
 
 func (s *LauncherState) Save() {
@@ -375,6 +495,7 @@ func (s *LauncherState) Save() {
 		JavaRuntimeMode:         s.JavaRuntimeMode,
 		WindowWidth:             s.WindowWidth,
 		WindowHeight:            s.WindowHeight,
+		InstalledProjects:       s.InstalledProjects,
 	}
 
 	bytes, err := json.MarshalIndent(data, "", "  ")
@@ -434,7 +555,117 @@ func (s *LauncherState) Load() {
 		} else {
 			s.WindowHeight = DefaultWindowHeight
 		}
+		if data.InstalledProjects != nil {
+			s.InstalledProjects = data.InstalledProjects
+		}
 	}
+}
+
+func (s *LauncherState) ScanInstalledFiles() []string {
+	mcDir := platform.GetMinecraftDir()
+	dirs := []string{
+		filepath.Join(mcDir, "mods"),
+		filepath.Join(mcDir, "resourcepacks"),
+		filepath.Join(mcDir, "shaderpacks"),
+		filepath.Join(mcDir, "modpacks"),
+	}
+
+	seen := make(map[string]bool)
+	var files []string
+
+	for _, d := range dirs {
+		entries, err := os.ReadDir(d)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				name := e.Name()
+				if !seen[name] {
+					seen[name] = true
+					files = append(files, name)
+				}
+			}
+		}
+	}
+	return files
+}
+
+func (s *LauncherState) getDecoratedModItemsLocked(installedFiles []string) []models.ModItem {
+	lowerFiles := make([]string, len(installedFiles))
+	for i, f := range installedFiles {
+		lowerFiles[i] = strings.ToLower(f)
+	}
+
+	result := make([]models.ModItem, len(s.ModItems))
+	for i, it := range s.ModItems {
+		itemCopy := it
+		isInstalled := false
+
+		if s.InstalledProjects != nil {
+			if f, ok := s.InstalledProjects[it.ProjectId]; ok && f != "" {
+				isInstalled = true
+			}
+		}
+
+		if !isInstalled && it.ProjectId != "" {
+			pidLower := strings.ToLower(it.ProjectId)
+			cleanPid := strings.TrimPrefix(pidLower, "cf-")
+			for _, f := range lowerFiles {
+				if strings.Contains(f, cleanPid) {
+					isInstalled = true
+					break
+				}
+			}
+		}
+
+		itemCopy.IsInstalled = isInstalled
+		if isInstalled {
+			itemCopy.ActionText = "Удалить"
+		} else {
+			itemCopy.ActionText = "Установить"
+		}
+		result[i] = itemCopy
+	}
+	return result
+}
+
+func (s *LauncherState) SetProjectInstalled(projectId, filename string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.InstalledProjects == nil {
+		s.InstalledProjects = make(map[string]string)
+	}
+	s.InstalledProjects[projectId] = filename
+	s.Save()
+}
+
+func (s *LauncherState) RemoveProjectInstalled(projectId string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.InstalledProjects != nil {
+		delete(s.InstalledProjects, projectId)
+	}
+	s.Save()
+}
+
+func (s *LauncherState) IsProjectInstalled(projectId string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.InstalledProjects == nil {
+		return false
+	}
+	_, ok := s.InstalledProjects[projectId]
+	return ok
+}
+
+func (s *LauncherState) GetInstalledProjectFile(projectId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.InstalledProjects == nil {
+		return ""
+	}
+	return s.InstalledProjects[projectId]
 }
 
 func (s *LauncherState) SetVersionCatalog(versions []models.VersionOption) {
@@ -480,4 +711,17 @@ func (s *LauncherState) SetAuth(hasAuth bool, accountType, nick, avatar string) 
 	}
 	s.AvatarUrl = avatar
 	s.Save()
+}
+
+func (s *LauncherState) GetJavaModeHint() string {
+	switch s.JavaRuntimeMode {
+	case "auto":
+		return "Автоматический выбор подходящей версии Java (Java 8 / 17 / 21) под версию игры."
+	case "system":
+		return "Использовать системную Java по умолчанию из PATH."
+	case "custom":
+		return "Использовать указанный вручную путь к исполняемому файлу Java."
+	default:
+		return "Лаунчер использует системную или указанную Java для запуска Minecraft."
+	}
 }

@@ -35,33 +35,37 @@
   height:0;
   display:none
 }
-html,body,#root {
-  background:0 0;
+html,body {
+  background-color: var(--window-bg, #0a1118) !important;
+  color-scheme: dark;
   width:100%;
   height:100%;
   margin:0;
-  padding:0
+  padding:0;
 }
 body {
   color:var(--text);
   isolation:isolate;
-  background:0 0;
+  background-color: var(--window-bg, #0a1118) !important;
   margin:0;
-  overflow:hidden
-}
-html.platform-macos body,html.platform-linux body {
-  background:0 0
+  overflow:hidden;
 }
 #root {
-  background:0 0;
+  background-color: var(--window-bg, #0a1118) !important;
   position:relative;
   overflow:hidden;
-  border-radius:20px!important
+  border-radius:20px;
 }
 .app-shell,.launcher-frame {
   position:relative;
   overflow:hidden;
-  border-radius:20px!important
+  border-radius:20px;
+}
+html.platform-linux #root,
+html.platform-linux .app-shell,
+html.platform-linux .launcher-frame,
+html.platform-linux body>canvas[data-liquid-ignore] {
+  border-radius: 0 !important;
 }
 body>canvas[data-liquid-ignore] {
   border-radius:20px!important;
@@ -1490,6 +1494,39 @@ img {
   margin-left:8px;
   display:grid;
   position:relative
+}
+.version-picker-option-actions {
+  z-index:3;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex:none;
+  margin-left:8px;
+}
+.version-delete-button {
+  background:rgba(255, 68, 68, 0.16);
+  border:1px solid rgba(255, 68, 68, 0.4);
+  color:#ff5c5c;
+  border-radius:6px;
+  width:24px;
+  height:24px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  padding:0;
+  transition:all 0.15s ease;
+  flex:none;
+}
+.version-delete-button:hover {
+  background:rgba(255, 68, 68, 0.38);
+  border-color:rgba(255, 68, 68, 0.85);
+  color:#ff2a2a;
+  box-shadow:0 0 10px rgba(255, 68, 68, 0.5);
+  transform:scale(1.1);
+}
+.version-delete-button:active {
+  transform:scale(0.95);
 }
 .version-picker-option+.version-picker-option {
   margin-top:2px

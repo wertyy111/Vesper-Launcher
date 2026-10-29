@@ -9,7 +9,6 @@ __attribute__((constructor)) static void setup_linux_env() {
         setenv("GDK_BACKEND", "x11", 1);
     }
     setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", 1);
-    setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", 1);
 }
 */
 import "C"
@@ -59,7 +58,7 @@ func main() {
 		Frameless:         isFrameless,
 		StartHidden:       false,
 		HideWindowOnClose: false,
-		BackgroundColour:  &options.RGBA{R: 0, G: 0, B: 0, A: 0},
+		BackgroundColour:  &options.RGBA{R: 10, G: 17, B: 24, A: 255},
 		LogLevel:          logger.ERROR,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
