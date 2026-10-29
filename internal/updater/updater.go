@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,7 +59,15 @@ type githubRelease struct {
 	} `json:"assets"`
 }
 
-// CheckUpdate checks GitHub releases for an available launcher update.
+type updateManifest struct {
+	Latest struct {
+		Version   string `json:"version"`
+		Title     string `json:"title"`
+		Changelog string `json:"changelog"`
+	} `json:"latest"`
+}
+
+// CheckUpdate checks GitHub releases or fallback manifest for an available launcher update.
 func (s *UpdateService) CheckUpdate() (*models.UpdatesSnapshot, error) {
 	if !s.config.Enabled {
 		return &models.UpdatesSnapshot{
@@ -67,51 +76,84 @@ func (s *UpdateService) CheckUpdate() (*models.UpdatesSnapshot, error) {
 		}, nil
 	}
 
-	// Extract repo path: e.g. "wertyy111/Updates-Vesper"
 	repoPart := strings.TrimPrefix(s.config.SourceUrl, "https://github.com/")
 	repoPart = strings.TrimSuffix(repoPart, "/")
 
 	apiUrl := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repoPart)
 	req, err := http.NewRequest("GET", apiUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "VesperLauncher/1.0")
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return &models.UpdatesSnapshot{
-			IsAvailable: false,
-			Version:     s.currentVersion,
-		}, nil
-	}
-
-	var rel githubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return nil, err
+	if err == nil {
+		req.Header.Set("User-Agent", "VesperLauncher/1.0")
+		if resp, err := s.client.Do(req); err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				var rel githubRelease
+				if err := json.NewDecoder(resp.Body).Decode(&rel); err == nil {
+					latestVer := strings.TrimPrefix(rel.TagName, "v")
+					isNewer := isVersionNewer(latestVer, s.currentVersion)
+					return &models.UpdatesSnapshot{
+						IsAvailable:  isNewer,
+						Version:      latestVer,
+						Title:        rel.Name,
+						ReleaseNotes: rel.Body,
+					}, nil
+				}
+			}
+		}
 	}
 
-	latestVer := strings.TrimPrefix(rel.TagName, "v")
-	isNewer := isVersionNewer(latestVer, s.currentVersion)
+	// Fallback to raw manifest.json from Updates-Vesper repository
+	manifestUrl := fmt.Sprintf("https://raw.githubusercontent.com/%s/main/manifest.json", repoPart)
+	if mReq, err := http.NewRequest("GET", manifestUrl, nil); err == nil {
+		mReq.Header.Set("User-Agent", "VesperLauncher/1.0")
+		if mResp, err := s.client.Do(mReq); err == nil {
+			defer mResp.Body.Close()
+			if mResp.StatusCode == http.StatusOK {
+				var manifest updateManifest
+				if err := json.NewDecoder(mResp.Body).Decode(&manifest); err == nil {
+					latestVer := strings.TrimPrefix(manifest.Latest.Version, "v")
+					isNewer := isVersionNewer(latestVer, s.currentVersion)
+					return &models.UpdatesSnapshot{
+						IsAvailable:  isNewer,
+						Version:      latestVer,
+						Title:        manifest.Latest.Title,
+						ReleaseNotes: manifest.Latest.Changelog,
+					}, nil
+				}
+			}
+		}
+	}
 
 	return &models.UpdatesSnapshot{
-		IsAvailable:  isNewer,
-		Version:      latestVer,
-		Title:        rel.Name,
-		ReleaseNotes: rel.Body,
+		IsAvailable: false,
+		Version:     s.currentVersion,
 	}, nil
 }
 
 func isVersionNewer(latest, current string) bool {
-	latest = strings.TrimSpace(latest)
-	current = strings.TrimSpace(current)
+	latest = strings.TrimSpace(strings.TrimPrefix(latest, "v"))
+	current = strings.TrimSpace(strings.TrimPrefix(current, "v"))
 	if latest == "" || current == "" {
 		return false
 	}
-	return latest != current
+	if latest == current {
+		return false
+	}
+
+	lParts := strings.Split(strings.Split(latest, "-")[0], ".")
+	cParts := strings.Split(strings.Split(current, "-")[0], ".")
+
+	for i := 0; i < len(lParts) && i < len(cParts); i++ {
+		lNum, err1 := strconv.Atoi(lParts[i])
+		cNum, err2 := strconv.Atoi(cParts[i])
+		if err1 == nil && err2 == nil {
+			if lNum > cNum {
+				return true
+			}
+			if lNum < cNum {
+				return false
+			}
+		}
+	}
+
+	return len(lParts) > len(cParts)
 }
