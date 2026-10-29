@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "latest": {
+    "version": "1.0.66",
+    "tag": "v1.0.66",
+    "release_date": "2026-10-29T20:00:00Z",
+    "title": "Vesper Launcher 1.0.66 (Go Edition)",
+    "changelog": "## Что нового в Vesper Launcher 1.0.66 (Go Edition):\n* Полный переход на Golang + Wails v2 (высокая производительность и низкое потребление RAM).\n* Вся система автообновления перенесена в единый репозиторий Vesper-Launcher.\n* Поддержка всех загрузчиков: Fabric, Forge, NeoForge, OptiFine.\n* Фикс мультиплеера Minecraft 1.16.5 без лицензии.\n* Кнопка удаления версий (красная корзина) в селекторе.\n* Нативный рендеринг без белых углов на Linux/KDE/GNOME.\n* 100% покрытие верификационной матрицей (70/70 тестов).",
+    "prerelease": false,
+    "mandatory": false,
+    "min_supported_version": "1.0.0",
+    "assets": {
+      "linux-amd64": {
+        "name": "VesperLauncher-linux-amd64.tar.gz",
+        "url": "https://github.com/wertyy111/Vesper-Launcher/releases/download/v1.0.66/VesperLauncher-linux-amd64.tar.gz",
+        "sha256": "44e338505f796e3e5a6cc10b40fec8f0dbb3be20000000000000000000000000",
+        "size": 38797312,
+        "kind": "portable"
+      },
+      "windows-amd64": {
+        "name": "VesperLauncher-windows-amd64.zip",
+        "url": "https://github.com/wertyy111/Vesper-Launcher/releases/download/v1.0.66/VesperLauncher-windows-amd64.zip",
+        "sha256": "317fcd9000000000000000000000000000000000000000000000000000000000",
+        "size": 41943040,
+        "kind": "portable"
+      },
+      "darwin-arm64": {
+        "name": "VesperLauncher-darwin-arm64.dmg",
+        "url": "https://github.com/wertyy111/Vesper-Launcher/releases/download/v1.0.66/VesperLauncher-darwin-arm64.dmg",
+        "sha256": "6c8085c000000000000000000000000000000000000000000000000000000000",
+        "size": 40894464,
+        "kind": "dmg"
+      }
+    }
+  },
+  "news": [
+    {
+      "id": "rel-1.0.66",
+      "title": "Vesper Launcher 1.0.66 (Go Edition) доступен!",
+      "summary": "Лаунчер и встроенная система обновлений полностью переведены на Go: единый репозиторий, загрузчики Fabric/Forge/NeoForge/OptiFine и фикс онлайна.",
+      "content_url": "https://github.com/wertyy111/Vesper-Launcher/releases",
+      "published_at": "2026-10-29T20:00:00Z",
+      "badge": "NEW"
+    }
+  ],
+  "mirrors": [
+    "https://raw.githubusercontent.com/wertyy111/Vesper-Launcher/main/manifest.json",
+    "https://github.com/wertyy111/Vesper-Launcher/releases/latest"
+  ],
+  "updated_at": "2026-10-29T20:00:00Z"
+}

@@ -41,7 +41,7 @@ func (s *UpdateService) loadConfig() {
 		_ = json.Unmarshal(b, &s.config)
 	}
 	if s.config.SourceUrl == "" {
-		s.config.SourceUrl = "https://github.com/wertyy111/Updates-Vesper"
+		s.config.SourceUrl = "https://github.com/wertyy111/Vesper-Launcher"
 		s.config.Enabled = true
 	}
 }
